@@ -1,0 +1,69 @@
+@use '../../../styles/variables' as *;
+@use '../../../styles/mixins' as *;
+
+.container {
+    background: $bg-primary;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-lg;
+    padding: 10px $space-lg;
+    display: flex;
+    align-items: center;
+    gap: $space-md;
+    width: 95%;
+    max-width: $overlay-max-width;
+    @include draggable;
+}
+
+.inputWrapper {
+    flex-grow: 1;
+    @include no-drag;
+}
+
+.input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: $text-primary;
+    font-size: $font-size-md;
+    outline: none;
+    padding: $space-sm 0;
+
+    &::placeholder {
+        color: $text-secondary;
+    }
+
+    &:disabled {
+        opacity: 0.5;
+    }
+}
+
+.sendBtn {
+    background: $text-primary;
+    border: none;
+    border-radius: $radius-sm;
+    width: $btn-size;
+    height: $btn-size;
+    @include flex-center;
+    @include no-drag;
+    cursor: pointer;
+    transition: $transition-fast;
+    flex-shrink: 0;
+
+    &:hover:not(:disabled) {
+        transform: scale(1.05);
+        background: #f0f0f0;
+    }
+
+    svg {
+        color: $text-dark;
+    }
+
+    &.loading {
+        opacity: 0.5;
+        cursor: wait;
+
+        svg {
+            animation: spin 1s linear infinite;
+        }
+    }
+}

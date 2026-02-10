@@ -1,0 +1,28 @@
+@use 'variables' as *;
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body {
+    background: transparent;
+    overflow: hidden;
+    height: 100vh;
+}
+
+body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: $font-family;
+}
+
+#root {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}

@@ -1,0 +1,24 @@
+@use '../../../styles/variables' as *;
+@use '../../../styles/mixins' as *;
+
+.brainBtn {
+    @include icon-button;
+    position: relative;
+
+    &.hasDoc {
+        background: $accent-brain;
+        box-shadow: 0 0 10px $accent-brain-glow;
+    }
+}
+
+.status {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: $accent-brain;
+    color: $text-primary;
+    font-size: 8px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-weight: bold;
+}

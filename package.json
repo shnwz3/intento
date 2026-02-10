@@ -1,0 +1,60 @@
+{
+    "name": "intento-app",
+    "version": "1.0.0",
+    "description": "Intento - AI-powered cursor assistant for intelligent text responses",
+    "main": "src/main/index.js",
+    "scripts": {
+        "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+        "build": "vite build && electron-builder",
+        "vite:dev": "vite",
+        "electron:dev": "electron .",
+        "python:install": "cd python && pip install -r requirements.txt",
+        "python:dev": "cd python && python main.py"
+    },
+    "dependencies": {
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0",
+        "zustand": "^4.5.0",
+        "lucide-react": "^0.344.0",
+        "@jitsi/robotjs": "^0.6.13",
+        "@google/generative-ai": "^0.21.0",
+        "openai": "^6.18.0",
+        "ollama": "^0.5.8",
+        "clipboardy": "2.3.0",
+        "electron-store": "^8.1.0",
+        "pdf-parse": "^1.1.1",
+        "axios": "^1.6.0",
+        "dotenv": "^16.4.0"
+    },
+    "devDependencies": {
+        "electron": "^33.0.0",
+        "electron-builder": "^24.9.1",
+        "vite": "^5.0.12",
+        "@vitejs/plugin-react": "^4.2.1",
+        "sass": "^1.70.0",
+        "concurrently": "^8.2.2",
+        "wait-on": "^7.2.0"
+    },
+    "build": {
+        "appId": "com.intento.app",
+        "productName": "Intento",
+        "directories": {
+            "output": "release"
+        },
+        "files": [
+            "src/main/**/*",
+            "src/preload/**/*",
+            "dist/**/*"
+        ],
+        "win": {
+            "target": [
+                "nsis"
+            ],
+            "icon": "resources/icon.ico"
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true
+        }
+    }
+}

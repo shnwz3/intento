@@ -1,0 +1,49 @@
+@use '../../../styles/variables' as *;
+@use '../../../styles/mixins' as *;
+
+.captureArea {
+    width: $capture-size;
+    height: $capture-size;
+    background: $bg-subtle;
+    border-radius: $radius-md;
+    @include flex-center;
+    @include no-drag;
+    cursor: pointer;
+    transition: $transition-fast;
+    overflow: hidden;
+    position: relative;
+    flex-shrink: 0;
+
+    &:hover {
+        background: $bg-hover;
+        transform: scale(1.05);
+    }
+}
+
+.icon {
+    color: $text-primary;
+}
+
+.thumbnail {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.hasScreenshot {
+    .icon {
+        display: none;
+    }
+
+    .thumbnail {
+        display: block;
+    }
+
+    &:hover .thumbnail {
+        opacity: 0.5;
+    }
+}

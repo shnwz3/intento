@@ -1,0 +1,54 @@
+// SCSS Reusable Mixins
+@use 'variables' as *;
+
+@mixin flex-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@mixin no-drag {
+    -webkit-app-region: no-drag;
+}
+
+@mixin draggable {
+    -webkit-app-region: drag;
+}
+
+@mixin hover-scale($scale: 1.05) {
+    transition: $transition-fast;
+
+    &:hover:not(:disabled) {
+        transform: scale($scale);
+    }
+}
+
+@mixin icon-button($size: $btn-size, $bg: $bg-button) {
+    @include flex-center;
+    @include no-drag;
+    width: $size;
+    height: $size;
+    background: $bg;
+    border: none;
+    border-radius: $radius-sm;
+    cursor: pointer;
+    transition: $transition-fast;
+    flex-shrink: 0;
+
+    &:hover:not(:disabled) {
+        background: $bg-hover;
+        transform: scale(1.05);
+    }
+
+    svg {
+        color: $text-primary;
+        width: 20px;
+        height: 20px;
+    }
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
