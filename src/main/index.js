@@ -8,8 +8,10 @@ const { registerBrainHandlers } = require('./ipc/brain.handlers');
 const { registerWindowHandlers } = require('./ipc/window.handlers');
 const { registerSettingsHandlers } = require('./ipc/settings.handlers');
 const { registerShortcuts, unregisterShortcuts } = require('./utils/shortcuts');
-const { createMainWindow, createHudWindow, getMainWindow, getHudWindow } = require('./windows/mainWindow');
+const { createMainWindow, getMainWindow } = require('./windows/mainWindow');
+const hudManager = require('./ui/HudManager');
 const { createBrainWindow } = require('./windows/brainWindow');
+const serviceManager = require('./services/ServiceManager');
 const BrainService = require('./services/brain/BrainService');
 
 // Disable caching for lightweight app
@@ -25,9 +27,12 @@ const isDev = !app.isPackaged;
 app.whenReady().then(async () => {
     console.log('🚀 Intento starting...');
 
+    // Initialize Services (DI Container)
+    serviceManager.initialize();
+
     // Create windows
     createMainWindow(isDev);
-    createHudWindow();
+    hudManager.createHudWindow();
 
     // Register all IPC handlers
     registerIpcHandlers();

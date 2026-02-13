@@ -1,17 +1,18 @@
 const { ipcMain } = require('electron');
-const VisionService = require('../services/vision/VisionService');
-const ScreenshotService = require('../services/screenshot/ScreenshotService');
-const BrainService = require('../services/brain/BrainService');
+const serviceManager = require('../services/ServiceManager');
 
-// Shared singleton instances
-const vision = new VisionService();
-const screenshot = new ScreenshotService();
-const brain = new BrainService();
+// We will fetch services lazily or after init
+let vision, screenshot, brain;
 
 /**
  * Register all vision-related IPC handlers
  */
 function registerIpcHandlers() {
+    // Get instances from ServiceManager
+    vision = serviceManager.get('VisionService');
+    screenshot = serviceManager.get('ScreenshotService');
+    brain = serviceManager.get('BrainService');
+
     // Check if vision AI is ready
     ipcMain.handle('vision:isReady', () => {
         return { ready: vision.isReady() };

@@ -301,6 +301,33 @@ class BrainService {
         return active ? active.tags.some((t) => t.value && t.value.trim() !== '') : false;
     }
 
+    /**
+     * Smartly determine if context is needed based on the prompt.
+     * Skips context for technical queries.
+     * @param {string} prompt 
+     */
+    getSmartContext(prompt) {
+        if (!this.hasContext()) return '';
+
+        // These keywords indicate purely technical queries where identity is irrelevant
+        const skipKeywords = [
+            'explain this code', 'debug', 'syntax error',
+            'what does this error', 'documentation',
+        ];
+
+        const lowerPrompt = (prompt || '').toLowerCase();
+        const shouldSkip = skipKeywords.some((k) => lowerPrompt.includes(k));
+
+        if (shouldSkip) {
+            console.log('🧠 Brain: Skipping (technical context)');
+            return '';
+        }
+
+        // For most other tasks, brain context makes responses more personalized
+        console.log('🧠 Brain: Injecting user memory');
+        return this.getContext();
+    }
+
     getTagCount() {
         const active = this.getActiveBrain();
         return active ? active.tags.length : 0;

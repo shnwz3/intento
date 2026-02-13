@@ -22,6 +22,8 @@ export default defineConfig({
     css: {
         preprocessorOptions: {
             scss: {
+                api: 'modern-compiler',
+                silenceDeprecations: ['legacy-js-api'],
                 additionalData: `@use "@styles/variables" as *; @use "@styles/mixins" as *;`,
             },
         },

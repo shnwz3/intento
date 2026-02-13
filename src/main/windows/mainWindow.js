@@ -2,7 +2,6 @@ const { BrowserWindow, screen } = require('electron');
 const path = require('path');
 
 let mainWindow = null;
-let hudWindow = null;
 let isCapturing = false;
 
 /**
@@ -12,12 +11,7 @@ function getMainWindow() {
     return mainWindow;
 }
 
-/**
- * @returns {BrowserWindow|null}
- */
-function getHudWindow() {
-    return hudWindow;
-}
+
 
 function setCapturing(value) {
     isCapturing = value;
@@ -70,80 +64,11 @@ function createMainWindow(isDev) {
     });
 }
 
-/**
- * Create the HUD (heads-up display) window
- */
-function createHudWindow() {
-    hudWindow = new BrowserWindow({
-        width: 500,
-        height: 60,
-        frame: false,
-        transparent: true,
-        alwaysOnTop: true,
-        resizable: false,
-        skipTaskbar: true,
-        focusable: false,
-        webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
-        },
-    });
 
-    hudWindow.setIgnoreMouseEvents(true);
-
-    if (!require('electron').app.isPackaged) {
-        hudWindow.loadURL('http://localhost:5173/hud.html');
-    } else {
-        hudWindow.loadFile(path.join(__dirname, '../../dist/hud.html'));
-    }
-
-    hudWindow.hide();
-
-    // Position at bottom center of screen
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { width, height } = primaryDisplay.workAreaSize;
-    hudWindow.setPosition(Math.floor((width - 500) / 2), height - 100);
-}
-
-/**
- * Show HUD with a message (without stealing focus)
- * @param {string} text
- */
-function showHud(text) {
-    if (!hudWindow) createHudWindow();
-    console.log(`🖥️ HUD: ${text}`);
-    hudWindow.webContents.send('hud:update', text);
-    hudWindow.showInactive();
-}
-
-/**
- * Hide the HUD
- */
-function hideHud() {
-    if (hudWindow) hudWindow.hide();
-}
-
-/**
- * Run a visual countdown on the HUD
- * @param {number} seconds
- * @param {string} actionText
- */
-async function startCountdown(seconds, actionText = 'Typing in') {
-    for (let i = seconds; i > 0; i--) {
-        showHud(`${actionText} ${i}s...`);
-        await new Promise((r) => setTimeout(r, 1000));
-    }
-    hideHud();
-}
 
 module.exports = {
     createMainWindow,
-    createHudWindow,
     getMainWindow,
-    getHudWindow,
-    showHud,
-    hideHud,
-    startCountdown,
     setCapturing,
     getCapturing,
 };

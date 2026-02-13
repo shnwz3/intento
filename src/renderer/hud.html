@@ -73,6 +73,13 @@
                 opacity: 1;
             }
         }
+
+        .lucide {
+            width: 16px;
+            height: 16px;
+            vertical-align: text-bottom;
+            margin-right: 6px;
+        }
     </style>
 </head>
 
@@ -86,7 +93,7 @@
         const hudText = document.getElementById('hudText');
 
         ipcRenderer.on('hud:update', (_event, text) => {
-            hudText.textContent = text;
+            hudText.innerHTML = text;
         });
     </script>
 </body>

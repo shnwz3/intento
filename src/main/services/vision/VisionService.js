@@ -3,10 +3,11 @@ const fs = require('fs');
 const path = require('path');
 const { cleanText, isRefusal, isLowQuality } = require('./utils/textCleaner');
 
+const promptService = require('../../prompts/PromptService');
+
 // Load AI Configuration
 let aiConfig = {
-    system_prompt:
-        'You are INTENTO. You are a direct-execution AI acting AS the user. NEVER provide suggestions, explanations, context, or meta-text like "Here is a reply". Output ONLY the exact, final text to be typed. Do not use quotation marks.',
+    system_prompt: promptService.SYSTEM_PROMPT,
     model_params: { max_tokens: 500, temperature: 0.75 },
 };
 
@@ -66,13 +67,13 @@ class VisionService {
      * @returns {Promise<{success: boolean, response?: string, error?: string}>}
      */
     async analyze(imageBase64, selectedText = '', prompt = '', brainContext = '') {
-        let userPrompt = prompt || 'Look at this screen and GENERATE the next substantive reply or data. OUTPUT ONLY THE TEXT.';
+        let userPrompt = prompt || promptService.DEFAULT_VISION_PROMPT;
 
         if (selectedText) {
-            userPrompt = `Context (User Selection): "${selectedText}"\n\nTask: ${userPrompt}`;
+            userPrompt = promptService.wrapWithSelectionContext(selectedText, userPrompt);
         }
         if (brainContext) {
-            userPrompt = `[THE BRAIN / MY DETAILS]:\n${brainContext}\n\n[TASK]:\n${userPrompt}`;
+            userPrompt = promptService.wrapWithBrainContext(brainContext, userPrompt);
         }
 
         // Ensure base64 string (not Buffer)
@@ -141,7 +142,7 @@ class VisionService {
             const response = await client.chat.completions.create({
                 model,
                 messages: [
-                    { role: 'system', content: 'You are a precise data extraction engine. Return only what is asked.' },
+                    { role: 'system', content: promptService.TEXT_ONLY_SYSTEM_PROMPT },
                     { role: 'user', content: prompt },
                 ],
                 max_tokens: 1000,
