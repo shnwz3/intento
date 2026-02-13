@@ -10,12 +10,23 @@ export default function MainOverlay() {
   const [placeholder, setPlaceholder] = useState('Ask about the screen...');
   const [screenshot, setScreenshot] = useState(null);
   const [hasBrain, setHasBrain] = useState(false);
+  const [activeBrainName, setActiveBrainName] = useState('');
 
-  // Check for brain context on mount
+  // Check for brain context on mount and listen for updates
   useEffect(() => {
+    // Initial fetch
     window.intentoAPI.getBrainStatus().then((status) => {
       setHasBrain(status.hasContext);
+      setActiveBrainName(status.activeName);
     });
+
+    // Listen for real-time updates
+    if (window.intentoAPI.onBrainUpdate) {
+        window.intentoAPI.onBrainUpdate((status) => {
+            setHasBrain(status.hasContext);
+            setActiveBrainName(status.activeName);
+        });
+    }
   }, []);
 
   // Listen for shortcut trigger
@@ -36,18 +47,29 @@ export default function MainOverlay() {
     if (!screenshot && !prompt) return;
 
     setIsLoading(true);
-    const result = await window.intentoAPI.analyze(
-      '',
-      prompt || 'Look at the screen and answer my question or give actions.'
-    );
+    // Show HUD to remind user to place cursor
+    window.intentoAPI.hudShow('Intento thinking... Place cursor for output!');
 
-    if (result.success) {
-      await window.intentoAPI.typeAtCursor(result.response, 5);
-      setPrompt('');
-      setPlaceholder('Response sent to cursor!');
-      setTimeout(() => setPlaceholder('Ask about the screen...'), 3000);
-    } else {
-      setPlaceholder('Error: ' + result.error);
+    try {
+      const result = await window.intentoAPI.analyze(
+        '',
+        prompt || 'Look at the screen and answer my question or give actions.'
+      );
+
+      // Hide thinking HUD (countdown will show its own updates)
+      window.intentoAPI.hudHide();
+
+      if (result.success) {
+        await window.intentoAPI.typeAtCursor(result.response, 5);
+        setPrompt('');
+        setPlaceholder('Response sent to cursor!');
+        setTimeout(() => setPlaceholder('Ask about the screen...'), 3000);
+      } else {
+        setPlaceholder('Error: ' + result.error);
+      }
+    } catch (err) {
+      window.intentoAPI.hudHide();
+      setPlaceholder('Error during analysis');
     }
 
     setIsLoading(false);
@@ -68,7 +90,12 @@ export default function MainOverlay() {
     <div className={styles.container}>
       <CaptureArea screenshot={screenshot} onCapture={handleCapture} />
 
-      <BrainButton hasContext={hasBrain} onClick={handleOpenBrain} />
+      <BrainButton 
+        hasContext={hasBrain} 
+        activeBrainName={activeBrainName}
+        isProcessing={isLoading}
+        onClick={handleOpenBrain} 
+      />
 
       <div className={styles.inputWrapper}>
         <input

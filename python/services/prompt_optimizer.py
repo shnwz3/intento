@@ -29,12 +29,20 @@ class PromptOptimizer:
         
         adjustments = []
         
-        # If too many short responses, add length emphasis
-        short_responses = [f for f in low_quality if len(f.get("response", "")) < 20]
-        if len(short_responses) > len(low_quality) * 0.3:
+        # If too many short responses, add length emphasis (but only if they are robotic/lazy)
+        lazy_responses = [f for f in low_quality if len(f.get("response", "")) < 15 and f.get("reason") == "robotic"]
+        if len(lazy_responses) > 2:
             adjustments.append(
-                "CRITICAL: Responses MUST be at least 25 characters. "
-                "Write full, complete sentences."
+                "CRITICAL: Avoid one-word robotic replies like 'Ok' or 'Sure'. "
+                "Write substantive human sentences."
+            )
+        
+        # If responses are too verbose or narrative
+        narrative = [f for f in low_quality if "I see" in f.get("response", "") or len(f.get("response", "")) > 150]
+        if narrative:
+            adjustments.append(
+                "BREVITY FIX: Stop narrating the screen or providing backstories. "
+                "Give the direct answer immediately."
             )
         
         # If robotic tone detected, add tone emphasis

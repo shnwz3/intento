@@ -1,407 +1,299 @@
 import { useState, useEffect, useCallback } from 'react';
 import styles from './BrainOnboarding.module.scss';
-import { ShieldCheck, Upload, Sparkles, Plus, X, Save, Trash2, Edit3, ChevronDown, Check } from 'lucide-react';
+import { Menu, ChevronLeft, Upload } from 'lucide-react';
+import { PERSONALITY_TEMPLATES } from '../personalityTemplates';
 
-const CATEGORY_LABELS = {
-  personal: '👤 Personal Identity',
-  behavior: '🎭 Behavior & Personality',
-  work: '💼 Work & Professional',
-  context: '🧠 AI Context',
-  extracted: '📄 Additional Info',
-  custom: '✏️ Custom Tags',
-};
+// Sub-components
+import NeuralSidebar from './components/NeuralSidebar';
+import AIEngineConfig from './components/AIEngineConfig';
+import TagGrid from './components/TagGrid';
+import PersonalityPresets from './components/PersonalityPresets';
+import NexusControls from './components/NexusControls';
+import AddBrainModal from './components/AddBrainModal';
+import DeleteConfirmModal from './components/DeleteConfirmModal';
 
-/**
- * BrainOnboarding - Supports multiple memory profiles (Brains).
- * Initially shows ONLY upload and privacy notice if no brains have context.
- * Allows switching between brains, renaming, and deleting.
- */
+// Constants
+import { 
+  TABS, 
+  CATEGORY_LABELS, 
+  CATEGORY_ICONS 
+} from './constants';
+
 export default function BrainOnboarding() {
   const [brains, setBrains] = useState([]);
   const [activeBrain, setActiveBrain] = useState(null);
   const [tags, setTags] = useState([]);
-  const [hasUploaded, setHasUploaded] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isExtracting, setIsExtracting] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState('identity');
   const [status, setStatus] = useState('');
-  const [editingId, setEditingId] = useState(null);
-  const [newTag, setNewTag] = useState({ label: '', value: '' });
-  const [showAddForm, setShowAddForm] = useState(false);
-  
-  // Multi-Brain UI State
-  const [showBrainList, setShowBrainList] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [brainToDelete, setBrainToDelete] = useState(null);
+  const [newBrainName, setNewBrainName] = useState('');
+  const [editingTag, setEditingTag] = useState(null);
   const [isRenaming, setIsRenaming] = useState(false);
-  const [tempBrainName, setTempBrainName] = useState('');
+  const [renameValue, setRenameValue] = useState('');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [aiConfig, setAiConfig] = useState(null);
+  const [apiCredits, setApiCredits] = useState({ balance: '', status: 'loading' });
 
-  // Load all brains and initial context
   const loadBrains = useCallback(async () => {
-    const list = await window.intentoAPI.brainList();
-    setBrains(list);
-    const active = list.find(b => b.isActive);
-    setActiveBrain(active);
-    
-    const tagResult = await window.intentoAPI.brainGetTags();
-    setTags(tagResult.tags);
-    
-    // Check if current brain has any filled context
-    const filled = tagResult.tags.some(t => t.value && t.value.trim());
-    if (filled) {
-      setHasUploaded(true);
-    } else {
-      setHasUploaded(false);
+    setIsLoading(true);
+    try {
+      const result = await window.intentoAPI.brainList();
+      const brainList = result || [];
+      setBrains(brainList);
+      
+      const active = brainList.find(b => b.isActive);
+      if (active) {
+        setActiveBrain(active);
+        const tagsRes = await window.intentoAPI.brainGetTags();
+        setTags(tagsRes?.tags || []);
+        
+        // Prioritize Neural Sync for untrained brains
+        if (active.filledCount === 0) {
+          setActiveTab('sync');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load brains:', error);
+      setStatus('System Sync Error');
+    }
+    setIsLoading(false);
+  }, []);
+
+  const loadAIConfig = useCallback(async () => {
+    try {
+      const config = await window.intentoAPI.getAIConfig();
+      setAiConfig(config);
+      if (config.activeProvider) {
+        const credits = await window.intentoAPI.getAICredits(config.activeProvider);
+        setApiCredits(credits);
+      }
+    } catch (e) {
+      console.error('Failed to load AI config:', e);
     }
   }, []);
 
   useEffect(() => {
     loadBrains();
-  }, [loadBrains]);
-
-  // Group tags by category
-  const groupedTags = tags.reduce((acc, tag) => {
-    const cat = tag.category || 'custom';
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(tag);
-    return acc;
-  }, {});
-
-  // Switching Brains
-  const handleSwitchBrain = async (id) => {
-    await window.intentoAPI.brainSetActive(id);
-    setShowBrainList(false);
-    loadBrains();
-    setStatus(`Switched to ${brains.find(b => b.id === id).name}`);
-  };
+    loadAIConfig();
+  }, [loadBrains, loadAIConfig]);
 
   const handleCreateBrain = async () => {
-    const name = `Brain ${brains.length + 1}`;
-    const result = await window.intentoAPI.brainCreate(name);
+    if (!newBrainName.trim()) return;
+    const result = await window.intentoAPI.brainCreate(newBrainName);
     if (result.success) {
+      setNewBrainName('');
+      setShowAddModal(false);
       loadBrains();
-      setStatus(`Created ${name}`);
-      setShowBrainList(false);
+      setActiveTab('sync'); // Default to sync for new brains
+      setStatus(`Initialized: ${newBrainName}`);
     }
   };
 
-  const handleDeleteBrain = async (e, id) => {
+  const handleDocUpload = async () => {
+    try {
+      setStatus('Reading document...');
+      const uploadRes = await window.intentoAPI.brainUploadDoc();
+      
+      if (uploadRes.success) {
+        setStatus('Extracting neural patterns...');
+        const extractRes = await window.intentoAPI.brainExtractTags(uploadRes.text);
+        
+        if (extractRes.success) {
+          setTags(extractRes.tags || []);
+          setStatus(`Extracted ${extractRes.extracted || 0} patterns!`);
+          setTimeout(() => {
+            setActiveTab('identity');
+            setStatus('');
+          }, 2000);
+          loadBrains(); // Refresh counts
+        } else {
+          setStatus(`Extraction failed: ${extractRes.error}`);
+        }
+      } else if (uploadRes.error !== 'cancelled') {
+        setStatus(`Upload failed: ${uploadRes.error}`);
+      } else {
+        setStatus('');
+      }
+    } catch (err) {
+      console.error('Doc upload failed:', err);
+      setStatus('Error processing document.');
+    }
+  };
+
+  const handleSwitchBrain = async (id) => {
+    await window.intentoAPI.brainSetActive(id);
+    loadBrains();
+  };
+
+  const handleDeleteBrain = async (id, e) => {
     e.stopPropagation();
-    if (brains.length <= 1) {
-      setStatus('⚠️ Cannot delete the only brain profile');
-      return;
-    }
-    const result = await window.intentoAPI.brainDeleteProfile(id);
-    if (result.success) {
-      loadBrains();
-      setStatus('Brain deleted');
-    } else {
-      setStatus(`❌ ${result.error}`);
-    }
+    const brain = brains.find(b => b.id === id);
+    if (brain) setBrainToDelete(brain);
   };
 
-  const startRenaming = () => {
-    setTempBrainName(activeBrain.name);
-    setIsRenaming(true);
+  const confirmDelete = async () => {
+    if (!brainToDelete) return;
+    const result = await window.intentoAPI.brainDeleteProfile(brainToDelete.id);
+    if (result.success) {
+      loadBrains();
+      setBrainToDelete(null);
+      setStatus(`Decommissioned: ${brainToDelete.name}`);
+      setTimeout(() => setStatus(''), 3000);
+    }
   };
 
   const handleRename = async () => {
-    if (!tempBrainName.trim()) return;
-    const result = await window.intentoAPI.brainRenameProfile(activeBrain.id, tempBrainName);
+    if (!renameValue.trim() || !activeBrain) return;
+    const result = await window.intentoAPI.brainRenameProfile(activeBrain.id, renameValue);
     if (result.success) {
       setIsRenaming(false);
       loadBrains();
-      setStatus('Brain renamed');
     }
-  };
-
-  // Upload document and extract tags
-  const handleUpload = useCallback(async () => {
-    setIsUploading(true);
-    setStatus('Opening file picker...');
-
-    const uploadResult = await window.intentoAPI.brainUploadDoc();
-    if (!uploadResult.success) {
-      setIsUploading(false);
-      setStatus(uploadResult.error === 'cancelled' ? '' : 'Upload failed');
-      return;
-    }
-
-    setStatus(`Uploaded ${uploadResult.fileName}. AI is analyzing...`);
-    setIsUploading(false);
-    setIsExtracting(true);
-
-    const extractResult = await window.intentoAPI.brainExtractTags(uploadResult.text);
-
-    if (extractResult.success) {
-      setTags(extractResult.tags);
-      setHasUploaded(true);
-      setStatus(`✅ AI analysis complete for ${activeBrain?.name}!`);
-    } else {
-      setStatus('❌ ' + extractResult.error);
-    }
-    setIsExtracting(false);
-  }, [activeBrain]);
-
-  const handleEditTag = (id, newValue) => {
-    setTags((prev) => prev.map((t) => (t.id === id ? { ...t, value: newValue } : t)));
-  };
-
-  const handleDeleteTag = (id) => {
-    setTags((prev) => prev.filter((t) => t.id !== id));
-  };
-
-  const handleAddTag = () => {
-    if (!newTag.label.trim() || !newTag.value.trim()) return;
-    const tag = { id: Date.now().toString(), label: newTag.label, value: newTag.value, category: 'custom' };
-    setTags((prev) => [...prev, tag]);
-    setNewTag({ label: '', value: '' });
-    setShowAddForm(false);
   };
 
   const handleSave = async () => {
     setIsSaving(true);
     const result = await window.intentoAPI.brainSaveTags(tags);
     if (result.success) {
-      setStatus(`✅ [${activeBrain?.name}] saved locally.`);
+      setStatus('Neural state preserved.');
+      setTimeout(() => setStatus(''), 3000);
+      loadBrains();
     }
     setIsSaving(false);
   };
 
-  const filledCount = tags.filter((t) => t.value && t.value.trim()).length;
+  const applyTemplate = (template) => {
+    setTags(prev => prev.map(tag => {
+      if (template.tags[tag.id]) return { ...tag, value: template.tags[tag.id] };
+      return tag;
+    }));
+    setStatus(`Applied "${template.name}" template`);
+  };
+
+  const handleResetCategory = (category) => {
+    setTags(prev => prev.map(tag => {
+      if (tag.category === category) return { ...tag, value: '' };
+      return tag;
+    }));
+  };
+
+  const handleUpdateConfig = async (updates) => {
+    const newConfig = { ...aiConfig, ...updates };
+    setAiConfig(newConfig);
+    const result = await window.intentoAPI.saveAIConfig(newConfig);
+    if (result.success) {
+        const credits = await window.intentoAPI.getAICredits(newConfig.activeProvider);
+        setApiCredits(credits);
+    }
+  };
+
+  const filteredTags = Array.isArray(tags) ? tags.filter(t => {
+    if (activeTab === 'identity') return t.category === 'personal' || t.category === 'work';
+    if (activeTab === 'personality') return t.category === 'behavior' || t.category === 'context';
+    return false;
+  }) : [];
 
   return (
-    <div className={styles.container}>
-      <div className={styles.card}>
-        {/* Header */}
-        <div className={styles.header}>
-          <div className={styles.iconContainer}>
-            <Sparkles className={styles.sparkleIcon} />
-          </div>
-          <h1 className={styles.title}>Memory Setup</h1>
-          <p className={styles.subtitle}>
-            Manage multiple "Brains" for different professional contexts.
-          </p>
-        </div>
+    <div className={`
+      ${styles.nexusContainer} 
+      ${!isSidebarOpen ? styles.sidebarClosed : ''} 
+      ${activeTab === 'settings' ? styles.settingsActive : ''}
+    `}>
+      <button className={styles.nexusToggle} onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+        {isSidebarOpen ? <ChevronLeft size={18} /> : <Menu size={20} />}
+      </button>
 
-        {/* Multi-Brain Selector */}
-        <div className={styles.brainSelector}>
-           <div className={styles.activeBrainContainer} onClick={() => setShowBrainList(!showBrainList)}>
-              {isRenaming ? (
-                <div className={styles.renameWrapper} onClick={e => e.stopPropagation()}>
-                   <input 
-                     value={tempBrainName} 
-                     onChange={e => setTempBrainName(e.target.value)}
-                     onKeyDown={e => e.key === 'Enter' && handleRename()}
-                     autoFocus
-                   />
-                   <button className={styles.confirmRename} onClick={handleRename}><Check size={14} /></button>
-                </div>
-              ) : (
-                <div className={styles.activeBrainName}>
-                  <BrainIcon size={18} className={styles.brainBrandIcon} />
-                  <span>{activeBrain?.name || 'Loading Brain...'}</span>
-                  <ChevronDown size={14} className={showBrainList ? styles.rotated : ''} />
-                </div>
-              )}
-              
-              {!isRenaming && (
-                <button className={styles.renameBtn} onClick={(e) => { e.stopPropagation(); startRenaming(); }} title="Rename Brain">
-                  <Edit3 size={14} />
-                </button>
-              )}
-           </div>
+      <NeuralSidebar 
+        brains={brains}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        handleSwitchBrain={handleSwitchBrain}
+        handleDeleteBrain={handleDeleteBrain}
+        setShowAddModal={setShowAddModal}
+        aiConfig={aiConfig}
+        apiCredits={apiCredits}
+      />
 
-           {showBrainList && (
-             <div className={styles.brainDropdown}>
-               {brains.map(b => (
-                 <div 
-                   key={b.id} 
-                   className={`${styles.brainItem} ${b.isActive ? styles.activeItem : ''}`}
-                   onClick={() => handleSwitchBrain(b.id)}
-                 >
-                   <div className={styles.brainItemInfo}>
-                      <span className={styles.brainItemName}>{b.name}</span>
-                      <span className={styles.brainItemTags}>{b.filledCount} tags</span>
-                   </div>
-                   {brains.length > 1 && (
-                     <button className={styles.deleteBrainBtn} onClick={(e) => handleDeleteBrain(e, b.id)} title="Delete Brain">
-                       <Trash2 size={12} />
-                     </button>
-                   )}
-                 </div>
-               ))}
-               <button className={styles.createBrainBtn} onClick={handleCreateBrain}>
-                 <Plus size={14} /> New Brain Profile
-               </button>
-             </div>
-           )}
-        </div>
-
-        {/* Upload Section - Primary Action */}
-        {!hasUploaded && !isExtracting && (
-          <div className={styles.uploadSection}>
-            <button
-               className={styles.uploadBtnLarge}
-               onClick={handleUpload}
-               disabled={isUploading}
-            >
-              <Upload size={24} />
-              <span>Upload Info for "{activeBrain?.name}"</span>
-            </button>
-            <div className={styles.privacyNotice}>
-              <ShieldCheck size={16} className={styles.shieldIcon} />
-              <p>
-                Intento does <strong>not</strong> save your data to the cloud. 
-                Each Brain profile stays strictly on your machine.
-              </p>
-            </div>
-          </div>
+      <main className={styles.commandCenter}>
+        {activeTab !== 'settings' && (
+          <NexusControls 
+            activeBrain={activeBrain}
+            isRenaming={isRenaming}
+            setIsRenaming={setIsRenaming}
+            renameValue={renameValue}
+            setRenameValue={setRenameValue}
+            handleRename={handleRename}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            TABS={TABS}
+            tags={tags}
+            isSaving={isSaving}
+            handleSave={handleSave}
+          />
         )}
 
-        {isExtracting && (
-          <div className={styles.loadingSection}>
-            <div className={styles.spinnerLarge} />
-            <p>Training "{activeBrain?.name}" with your document...</p>
-          </div>
-        )}
-
-        {/* Tags UI - Only visible after upload or if existing */}
-        {hasUploaded && !isExtracting && (
-          <div className={styles.tagsContainer}>
-            <div className={styles.topActions}>
-               <div className={styles.progressInfo}>
-                 <span className={styles.filledText}>{filledCount}/{tags.length} Memory Points</span>
-                 <div className={styles.miniProgress}>
-                   <div className={styles.miniFill} style={{ width: `${tags.length ? (filledCount / tags.length) * 100 : 0}%` }} />
-                 </div>
-               </div>
-               <button className={styles.reUploadBtn} onClick={handleUpload}>
-                  <Upload size={14} /> Update Doc
-               </button>
+        <section className={styles.neuralZone}>
+          {isLoading ? (
+            <div className={styles.neuralLoading}>
+              <div className={styles.syncSpinner}></div>
+              <span>Synchronizing Pathways...</span>
             </div>
-
-            {status && <p className={styles.statusLine}>{status}</p>}
-
-            <div className={styles.scrollArea}>
-              {Object.entries(CATEGORY_LABELS).map(([category, label]) => {
-                const catTags = groupedTags[category];
-                if (!catTags || catTags.length === 0) return null;
-
-                return (
-                  <div key={category} className={styles.categoryBlock}>
-                    <h3 className={styles.categoryTitle}>{label}</h3>
-                    <div className={styles.tagGrid}>
-                      {catTags.map((tag) => (
-                        <div key={tag.id} className={`${styles.tagCard} ${!tag.value ? styles.tagEmpty : ''}`}>
-                          <div className={styles.tagInfo}>
-                            <label className={styles.tagLabel}>{tag.label}</label>
-                            {editingId === tag.id ? (
-                              tag.options ? (
-                                <select
-                                  className={styles.tagSelect}
-                                  value={tag.value}
-                                  onChange={(e) => {
-                                    handleEditTag(tag.id, e.target.value);
-                                    setEditingId(null);
-                                  }}
-                                  onBlur={() => setEditingId(null)}
-                                  autoFocus
-                                >
-                                  <option value="" disabled>Select...</option>
-                                  {tag.options.map(opt => (
-                                    <option key={opt} value={opt}>{opt}</option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <input
-                                  className={styles.tagInput}
-                                  value={tag.value}
-                                  onChange={(e) => handleEditTag(tag.id, e.target.value)}
-                                  onBlur={() => setEditingId(null)}
-                                  autoFocus
-                                />
-                              )
-                            ) : (
-                              <div className={styles.tagValue} onClick={() => setEditingId(tag.id)}>
-                                {tag.value || <span className={styles.placeholderText}>{tag.placeholder || 'Click to fill...'}</span>}
-                              </div>
-                            )}
-                          </div>
-                          <button className={styles.tagAction} onClick={() => handleDeleteTag(tag.id)}>
-                            <X size={12} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className={styles.footerActions}>
-              <button className={styles.addBtn} onClick={() => setShowAddForm(true)}>
-                <Plus size={16} /> Add Tag
-              </button>
-              <button 
-                className={styles.saveBtnLarge} 
-                onClick={handleSave}
-                disabled={isSaving}
-              >
-                <Save size={18} />
-                {isSaving ? 'Storing...' : `Update [${activeBrain?.name}]`}
-              </button>
-            </div>
-
-            {showAddForm && (
-              <div className={styles.modalOverlay}>
-                <div className={styles.addModal}>
-                  <h3>New Memory Point for {activeBrain?.name}</h3>
-                  <input 
-                    placeholder="Label" 
-                    value={newTag.label}
-                    onChange={e => setNewTag({...newTag, label: e.target.value})}
-                  />
-                  <input 
-                    placeholder="Value" 
-                    value={newTag.value}
-                    onChange={e => setNewTag({...newTag, value: e.target.value})}
-                  />
-                  <div className={styles.modalBtns}>
-                    <button onClick={() => setShowAddForm(false)}>Cancel</button>
-                    <button className={styles.confirmBtn} onClick={handleAddTag}>Add Tag</button>
-                  </div>
-                </div>
+          ) : activeTab === 'sync' ? (
+            <div className={styles.syncZone}>
+              <div className={styles.uploadCard}>
+                <Upload size={40} className={styles.uploadIcon} />
+                <h3>Ingest Knowledge Base</h3>
+                <p>Upload PDFs or documents to train this brain on specific facts.</p>
+                <button className={styles.nexusActionBtn} onClick={handleDocUpload}>Select Documents</button>
               </div>
-            )}
-
-            <div className={styles.privacyFooter}>
-              <ShieldCheck size={12} />
-              <span>Everything stays on your disk. Switch brains to change context.</span>
             </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+          ) : activeTab === 'settings' ? (
+            <AIEngineConfig 
+              aiConfig={aiConfig}
+              apiCredits={apiCredits}
+              handleUpdateConfig={handleUpdateConfig}
+            />
+          ) : (
+            <div className={styles.trainingGrid}>
+              {activeTab === 'personality' && (
+                <PersonalityPresets 
+                  PERSONALITY_TEMPLATES={PERSONALITY_TEMPLATES}
+                  applyTemplate={applyTemplate}
+                />
+              )}
+              <TagGrid 
+                filteredTags={filteredTags}
+                editingTag={editingTag}
+                setEditingTag={setEditingTag}
+                setTags={setTags}
+                CATEGORY_LABELS={CATEGORY_LABELS}
+                CATEGORY_ICONS={CATEGORY_ICONS}
+                handleResetCategory={handleResetCategory}
+              />
+            </div>
+          )}
+        </section>
+      </main>
 
-// Simple Brain Icon for the brand
-function BrainIcon({ size, className }) {
-  return (
-    <svg 
-      width={size} height={size} 
-      viewBox="0 0 24 24" fill="none" 
-      stroke="currentColor" strokeWidth="2" 
-      strokeLinecap="round" strokeLinejoin="round" 
-      className={className}
-    >
-      <path d="M9.5 2A5 5 0 0 1 12 7v5" />
-      <path d="M12 12v5a5 5 0 0 1-2.5 5" />
-      <path d="M12 12H7a5 5 0 0 1-5-2.5" />
-      <path d="M17 12h5a5 5 0 0 1 2.5 5" />
-      <path d="M12 12V7a5 5 0 0 1 5-5" />
-      <path d="M12 12v5a5 5 0 0 1 2.5 5" />
-      <path d="M12 12H7a5 5 0 0 0-5 2.5" />
-      <path d="M17 12h5a5 5 0 0 0 2.5-5" />
-    </svg>
+      {showAddModal && (
+        <AddBrainModal 
+          newBrainName={newBrainName}
+          setNewBrainName={setNewBrainName}
+          handleCreateBrain={handleCreateBrain}
+          setShowAddModal={setShowAddModal}
+        />
+      )}
+
+      {brainToDelete && (
+        <DeleteConfirmModal 
+          brainName={brainToDelete.name}
+          onConfirm={confirmDelete}
+          onCancel={() => setBrainToDelete(null)}
+        />
+      )}
+    </div>
   );
 }

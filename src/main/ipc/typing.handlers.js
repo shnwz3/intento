@@ -8,7 +8,11 @@ const typing = new TypingService();
  */
 function registerTypingHandlers() {
     ipcMain.handle('text:typeAtCursor', async (_event, { text, countdown = 0 }) => {
-        return typing.typeAtCursor(text, countdown);
+        if (countdown > 0) {
+            const { startCountdown } = require('../windows/mainWindow');
+            await startCountdown(countdown, 'Place cursor! Typing in');
+        }
+        return typing.typeAtCursor(text, 0);
     });
 
     console.log('📡 Typing IPC handlers registered');

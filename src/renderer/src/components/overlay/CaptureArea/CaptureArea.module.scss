@@ -43,7 +43,31 @@
         display: block;
     }
 
-    &:hover .thumbnail {
-        opacity: 0.5;
+    &:hover {
+        .thumbnail {
+            opacity: 0.4;
+            filter: blur(1px);
+        }
+
+        .overlay {
+            opacity: 1;
+        }
     }
+}
+
+.overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    @include flex-center;
+    background: rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    transition: $transition-fast;
+}
+
+.refreshIcon {
+    color: #fff;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
 }

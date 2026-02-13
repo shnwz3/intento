@@ -75,7 +75,7 @@ function createMainWindow(isDev) {
  */
 function createHudWindow() {
     hudWindow = new BrowserWindow({
-        width: 300,
+        width: 500,
         height: 60,
         frame: false,
         transparent: true,
@@ -102,7 +102,7 @@ function createHudWindow() {
     // Position at bottom center of screen
     const primaryDisplay = screen.getPrimaryDisplay();
     const { width, height } = primaryDisplay.workAreaSize;
-    hudWindow.setPosition(Math.floor((width - 300) / 2), height - 100);
+    hudWindow.setPosition(Math.floor((width - 500) / 2), height - 100);
 }
 
 /**

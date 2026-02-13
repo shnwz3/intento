@@ -6,7 +6,7 @@ const { cleanText, isRefusal, isLowQuality } = require('./utils/textCleaner');
 // Load AI Configuration
 let aiConfig = {
     system_prompt:
-        'You are INTENTO. Provide high-quality, humanized, and substantive responses ONLY.',
+        'You are INTENTO. You are a direct-execution AI acting AS the user. NEVER provide suggestions, explanations, context, or meta-text like "Here is a reply". Output ONLY the exact, final text to be typed. Do not use quotation marks.',
     model_params: { max_tokens: 500, temperature: 0.75 },
 };
 

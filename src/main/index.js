@@ -6,6 +6,7 @@ const { registerIpcHandlers } = require('./ipc/vision.handlers');
 const { registerTypingHandlers } = require('./ipc/typing.handlers');
 const { registerBrainHandlers } = require('./ipc/brain.handlers');
 const { registerWindowHandlers } = require('./ipc/window.handlers');
+const { registerSettingsHandlers } = require('./ipc/settings.handlers');
 const { registerShortcuts, unregisterShortcuts } = require('./utils/shortcuts');
 const { createMainWindow, createHudWindow, getMainWindow, getHudWindow } = require('./windows/mainWindow');
 const { createBrainWindow } = require('./windows/brainWindow');
@@ -33,6 +34,7 @@ app.whenReady().then(async () => {
     registerTypingHandlers();
     registerBrainHandlers(isDev);
     registerWindowHandlers();
+    registerSettingsHandlers();
 
     // Register global shortcuts
     registerShortcuts();

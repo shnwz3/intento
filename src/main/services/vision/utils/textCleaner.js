@@ -62,7 +62,7 @@ function isLowQuality(text) {
     const clean = text.trim();
 
     // Hard length gate
-    if (clean.length < 20) return true;
+    if (clean.length < 5) return true;
 
     // Robotic signatures
     const roboticSignatures = [

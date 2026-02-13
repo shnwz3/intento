@@ -1,37 +1,690 @@
-.container {
+.nexusContainer {
     width: 100%;
     height: 100vh;
-    background: radial-gradient(circle at top right, #1a1a2e 0%, #0d0d12 100%);
+    background: #09090b;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
     color: #fff;
     font-family: 'Inter', system-ui, sans-serif;
     overflow: hidden;
-    box-sizing: border-box;
+    position: relative;
+
+    // Mesh gradient background
+    &::before {
+        content: '';
+        position: absolute;
+        top: -10%;
+        left: -10%;
+        width: 120%;
+        height: 120%;
+        background: radial-gradient(circle at 20% 30%, rgba(99, 102, 241, 0.05) 0%, transparent 40%),
+            radial-gradient(circle at 80% 70%, rgba(168, 85, 247, 0.05) 0%, transparent 40%);
+        z-index: 0;
+        pointer-events: none;
+    }
 }
 
-.card {
-    width: 100%;
-    max-width: 900px;
-    height: 100%;
-    max-height: calc(100vh - 40px);
+.settingsActive {
+    .neuralZone {
+        padding: 0 !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+}
+
+.nexusToggle {
+    position: absolute;
+    left: 24px;
+    top: 48px;
     background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    color: #6366f1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 100;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &:hover {
+        background: rgba(99, 102, 241, 0.1);
+        transform: scale(1.05);
+        color: #fff;
+    }
+}
+
+// ============ NEURAL SIDEBAR ============
+
+.sidebar {
+    width: 280px;
+    height: 100%;
+    background: rgba(9, 9, 11, 0.8);
     backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 24px;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
     display: flex;
     flex-direction: column;
-    box-shadow: 0 40px 100px rgba(0, 0, 0, 0.5);
-    animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 10;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sectionLabel {
+    padding: 24px 24px 12px;
+    font-size: 10px;
+    font-weight: 800;
+    color: #3f3f46;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.sidebarClosed {
+    .sidebar {
+        width: 0;
+        opacity: 0;
+        pointer-events: none;
+        border-right-color: transparent;
+    }
+
+    .nexusToggle {
+        left: 24px; // Stays exactly where it was
+    }
+}
+
+.sidebarHeader {
+    padding: 48px 24px 24px 68px; // Increased left padding to clear toggle
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: padding 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.headerActions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.brandGroup {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    .neuralIcon {
+        width: 32px;
+        height: 32px;
+        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    span {
+        font-size: 11px;
+        font-weight: 800;
+        color: #fff;
+        letter-spacing: 0.1em;
+    }
+}
+
+.addBrainBtn {
+    background: #6366f1;
+    border: none;
+    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+        background: #4f46e5;
+        transform: scale(1.05);
+    }
+}
+
+.brainList {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    &::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 2px;
+    }
+}
+
+.brainNavItem {
+    padding: 12px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+    position: relative;
+    overflow: hidden;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    &.navActive {
+        background: rgba(99, 102, 241, 0.08);
+        border-color: rgba(99, 102, 241, 0.2);
+
+        &::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 20%;
+            bottom: 20%;
+            width: 3px;
+            background: #6366f1;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .navBrainIcon {
+            color: #6366f1;
+        }
+
+        .navName {
+            color: #fff;
+        }
+    }
+}
+
+.navBrainIcon {
+    color: #52525b;
+    transition: color 0.2s;
+}
+
+.navInfo {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.navName {
+    font-size: 13px;
+    font-weight: 600;
+    color: #a1a1aa;
+}
+
+.navMeta {
+    font-size: 10px;
+    color: #52525b;
+}
+
+.navDelete {
+    opacity: 0;
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    padding: 4px;
+    transition: opacity 0.2s;
+}
+
+.brainNavItem:hover .navDelete {
+    opacity: 0.6;
+}
+
+.sidebarFooter {
+    padding: 16px 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sidebarSettings {
+    padding: 24px 16px 40px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.statusBadge {
+    padding: 6px 12px;
+    background: rgba(9, 9, 11, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #6366f1;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: inline-block;
+}
+
+// ============ MAIN COMMAND CENTER ============
+
+.commandCenter {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #09090b;
+    position: relative;
     overflow: hidden;
 }
 
-@keyframes slideUp {
+.nexusControls {
+    padding: 32px 60px 24px;
+    z-index: 10;
+
+    @media (max-width: 1024px) {
+        padding: 24px 32px 20px;
+    }
+
+    @media (max-width: 480px) {
+        padding: 20px 16px 16px;
+    }
+}
+
+.nexusHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 40px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    flex-wrap: wrap; // Allow wrapping on very small screens
+
+    @media (max-width: 768px) {
+        gap: 24px;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .headerBranding {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+
+        .titleWithRename {
+            display: flex;
+            align-items: center;
+
+            .titleGroup {
+                display: flex;
+                align-items: center;
+                gap: 16px;
+
+                h1 {
+                    font-size: 32px;
+                    font-weight: 800;
+                    background: linear-gradient(to right, #fff, #a1a1aa);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    background-clip: text;
+                    margin: 0;
+                    letter-spacing: -1px;
+                    white-space: nowrap; // Prevent title breaking
+
+                    @media (max-width: 1024px) {
+                        font-size: 24px;
+                    }
+                }
+
+                .editBtn {
+                    background: none;
+                    border: none;
+                    color: #52525b;
+                    cursor: pointer;
+                    transition: all 0.2s;
+
+                    &:hover {
+                        color: #fff;
+                    }
+                }
+            }
+
+            .renameWrapper {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+
+                input {
+                    background: rgba(255, 255, 255, 0.05);
+                    border: 1px solid #6366f1;
+                    border-radius: 12px;
+                    padding: 8px 16px;
+                    color: #fff;
+                    font-size: 24px;
+                    font-weight: 800;
+                    outline: none;
+                }
+
+                button {
+                    background: #6366f1;
+                    color: #fff;
+                    border: none;
+                    padding: 8px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+
+                    &:hover {
+                        background: #4f46e5;
+                    }
+                }
+            }
+        }
+
+        .statusRow {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+
+            .integrityBadge {
+                background: rgba(99, 102, 241, 0.1);
+                border: 1px solid rgba(99, 102, 241, 0.2);
+                padding: 4px 12px;
+                border-radius: 100px;
+                font-size: 11px;
+                font-weight: 700;
+                color: #818cf8;
+                width: fit-content;
+                letter-spacing: 0.5px;
+                text-transform: uppercase;
+            }
+
+            .nexusStatus {
+                font-size: 11px;
+                font-weight: 700;
+                color: #22c55e;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                animation: pulse 2s infinite;
+                white-space: nowrap;
+            }
+        }
+    }
+
+    @keyframes pulse {
+        0% {
+            opacity: 0.6;
+        }
+
+        50% {
+            opacity: 1;
+        }
+
+        100% {
+            opacity: 0.6;
+        }
+    }
+
+    .controlsRight {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 16px;
+
+        @media (max-width: 768px) {
+            width: 100%;
+            flex-direction: column; // Stack on mobile for safety
+            align-items: stretch; // Full width controls
+            gap: 12px;
+        }
+
+        .tabNav {
+            display: flex;
+            gap: 4px;
+            background: rgba(255, 255, 255, 0.02);
+            padding: 4px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            flex-wrap: wrap; // Allow tabs to wrap if needed
+            justify-content: center; // Center tabs on small screens
+
+            @media (max-width: 768px) {
+                justify-content: space-between; // Spread out on mobile
+            }
+        }
+
+        .tabBtn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #71717a;
+            background: none;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap; // Keep tab text on one line
+
+            &:hover {
+                color: #fff;
+                background: rgba(255, 255, 255, 0.03);
+            }
+
+            &.tabActive {
+                background: #fff;
+                color: #09090b;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            }
+
+            @media (max-width: 1024px) {
+                padding: 6px 12px;
+                font-size: 11px;
+            }
+        }
+    }
+}
+
+.sidebarClosed {
+    .nexusHeader {
+        padding-left: 80px;
+    }
+
+    .neuralZone {
+        padding-left: 80px;
+        padding-right: 80px;
+    }
+}
+
+.headerBranding {
+    .brandingTop {
+        font-size: 11px;
+        font-weight: 800;
+        color: #6366f1;
+        letter-spacing: 0.3em;
+        margin-bottom: 8px;
+    }
+
+    .titleWithRename {
+        margin-bottom: 8px;
+
+        .titleGroup {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+
+            h1 {
+                font-size: 36px;
+                font-weight: 900;
+                margin: 0;
+                letter-spacing: -0.04em;
+                background: linear-gradient(to bottom, #fff, #a1a1aa);
+                background-clip: text;
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }
+
+            .editBtn {
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                color: #52525b;
+                padding: 6px;
+                border-radius: 8px;
+                cursor: pointer;
+                transition: all 0.2s;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+
+                &:hover {
+                    color: #fff;
+                    background: rgba(255, 255, 255, 0.1);
+                }
+            }
+        }
+
+        .renameWrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+
+            input {
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid #6366f1;
+                border-radius: 12px;
+                padding: 10px 16px;
+                color: #fff;
+                font-size: 28px;
+                font-weight: 800;
+                outline: none;
+                width: fit-content;
+                min-width: 200px;
+            }
+
+            button {
+                background: #6366f1;
+                color: #fff;
+                border: none;
+                padding: 10px;
+                border-radius: 10px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s;
+
+                &:hover {
+                    background: #4f46e5;
+                }
+            }
+        }
+    }
+
+    p {
+        font-size: 14px;
+        color: #71717a;
+        margin: 0;
+    }
+}
+
+.tabNav {
+    display: flex;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    padding: 4px;
+    border-radius: 12px;
+    width: fit-content;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tabBtn {
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #71717a;
+    background: none;
+    border: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    &.tabActive {
+        background: #fff;
+        color: #09090b;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+}
+
+// ============ NEURAL ZONE ============
+
+.neuralZone {
+    flex: 1;
+    padding: 0 60px 40px;
+    overflow-y: auto;
+    transition: padding 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 3px;
+    }
+}
+
+.neuralLoading {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    color: #52525b;
+
+    .syncSpinner {
+        width: 32px;
+        height: 32px;
+        border: 2px solid rgba(99, 102, 241, 0.1);
+        border-top-color: #6366f1;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.trainingGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+    animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
     from {
         opacity: 0;
-        transform: translateY(20px);
+        transform: translateY(10px);
     }
 
     to {
@@ -40,479 +693,200 @@
     }
 }
 
-// ============ HEADER ============
+// ============ PANELS ============
 
-.header {
-    padding: 12px 24px 8px;
-    text-align: center;
-}
+.panelHeader {
+    margin-bottom: 20px;
 
-.iconContainer {
-    width: 32px;
-    height: 32px;
-    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 12px;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-}
-
-.sparkleIcon {
-    color: #fff;
-}
-
-.title {
-    font-size: 22px;
-    font-weight: 700;
-    margin-bottom: 4px;
-    background: linear-gradient(to right, #fff, #a1a1aa);
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-
-.subtitle {
-    font-size: 14px;
-    color: #a1a1aa;
-    max-width: 480px;
-    margin: 0 auto;
-}
-
-// ============ BRAIN SELECTOR ============
-
-.brainSelector {
-    position: relative;
-    width: fit-content;
-    margin: 0 auto 16px;
-    z-index: 100;
-}
-
-.activeBrainContainer {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 18px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 12px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-
-    &:hover {
-        background: rgba(255, 255, 255, 0.08);
-        border-color: rgba(255, 255, 255, 0.25);
+    h3 {
+        font-size: 14px;
+        font-weight: 800;
+        color: #fff;
+        margin: 0;
+        letter-spacing: 0.05em;
     }
-}
-
-.activeBrainName {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-weight: 600;
-    color: #e2e8f0;
-    font-size: 15px;
 
     span {
-        max-width: 200px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        font-size: 12px;
+        color: #52525b;
     }
 }
 
-.brainBrandIcon {
-    color: #818cf8;
+.templateScroll {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
 }
 
-.rotated {
-    transform: rotate(180deg);
-}
-
-.renameBtn {
-    background: none;
-    border: none;
-    color: #71717a;
-    padding: 4px;
-    border-radius: 4px;
-    cursor: pointer;
+.nexusTemplateCard {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    padding: 16px;
     display: flex;
     align-items: center;
-    justify-content: center;
+    gap: 16px;
+    cursor: pointer;
+    text-align: left;
     transition: all 0.2s;
-
-    &:hover {
-        background: rgba(255, 255, 255, 0.1);
-        color: #fff;
-    }
-}
-
-.renameWrapper {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-
-    input {
-        background: rgba(0, 0, 0, 0.2);
-        border: 1px solid #6366f1;
-        color: #fff;
-        padding: 4px 8px;
-        border-radius: 6px;
-        font-size: 14px;
-        outline: none;
-    }
-}
-
-.confirmRename {
-    background: #6366f1;
-    color: #fff;
-    border: none;
-    width: 24px;
-    height: 24px;
-    border-radius: 4px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.brainDropdown {
-    position: absolute;
-    top: calc(100% + 8px);
-    left: 50%;
-    transform: translateX(-50%);
-    width: 260px;
-    background: #18181b;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-    padding: 8px;
-    animation: dropdownFade 0.2s ease;
-}
-
-@keyframes dropdownFade {
-    from {
-        opacity: 0;
-        transform: translateX(-50%) translateY(-10px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-    }
-}
-
-.brainItem {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 12px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.2s;
-    margin-bottom: 2px;
 
     &:hover {
         background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(99, 102, 241, 0.3);
+        transform: translateY(-2px);
     }
 
-    &.activeItem {
-        background: rgba(99, 102, 241, 0.15);
-        border: 1px solid rgba(99, 102, 241, 0.3);
+    .tempIcon {
+        font-size: 24px;
+        color: #6366f1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .tempLabels {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .tempName {
+        font-size: 13px;
+        font-weight: 700;
+        color: #fff;
+    }
+
+    .tempDesc {
+        font-size: 11px;
+        color: #71717a;
     }
 }
 
-.brainItemInfo {
-    display: flex;
-    flex-direction: column;
+.nexusCategory {
+    margin-bottom: 32px;
+
+    .catHeader {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+
+        .catTitleGroup {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+
+            .catIcon {
+                color: #6366f1;
+                opacity: 0.8;
+            }
+        }
+
+        h3 {
+            font-size: 12px;
+            font-weight: 800;
+            color: #52525b;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin: 0;
+        }
+    }
 }
 
-.brainItemName {
-    font-size: 14px;
-    font-weight: 500;
-    color: #fff;
-}
-
-.brainItemTags {
-    font-size: 11px;
-    color: #71717a;
-}
-
-.deleteBrainBtn {
-    background: none;
-    border: none;
+.resetBtn {
+    background: rgba(239, 68, 68, 0.05);
+    border: 1px solid rgba(239, 68, 68, 0.1);
     color: #ef4444;
-    opacity: 0.5;
-    padding: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 10px;
     border-radius: 6px;
     cursor: pointer;
-    transition: all 0.2s;
 
     &:hover {
-        background: rgba(239, 68, 68, 0.15);
-        opacity: 1;
+        background: rgba(239, 68, 68, 0.1);
     }
 }
 
-.createBrainBtn {
-    width: 100%;
-    margin-top: 8px;
-    padding: 10px;
-    background: none;
-    border: 1px dashed rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    color: #a1a1aa;
-    font-size: 13px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
-
-    &:hover {
-        border-color: #6366f1;
-        color: #fff;
-        background: rgba(99, 102, 241, 0.05);
-    }
-}
-
-// ============ UPLOAD SECTION ============
-
-.uploadSection {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 0 40px 40px;
-}
-
-.uploadBtnLarge {
-    width: 100%;
-    max-width: 400px;
-    height: 200px;
-    background: rgba(255, 255, 255, 0.02);
-    border: 2px dashed rgba(255, 255, 255, 0.1);
-    border-radius: 20px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+.nexusTagGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 16px;
-    color: #fff;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-
-    &:hover {
-        background: rgba(99, 102, 241, 0.05);
-        border-color: #6366f1;
-        transform: translateY(-4px);
-    }
-
-    span {
-        font-size: 16px;
-        font-weight: 500;
-    }
 }
 
-.privacyNotice {
-    margin-top: 32px;
-    padding: 20px;
-    background: rgba(34, 197, 94, 0.05);
-    border: 1px solid rgba(34, 197, 94, 0.15);
+.nexusTagCard {
+    background: #0d0d0f;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 16px 20px;
     border-radius: 16px;
-    display: flex;
-    gap: 12px;
-    max-width: 500px;
-    color: #86efac;
-    font-size: 13px;
-    line-height: 1.5;
-
-    p {
-        margin: 0;
-    }
-
-    strong {
-        color: #fff;
-        font-weight: 600;
-    }
-}
-
-.shieldIcon {
-    flex-shrink: 0;
-    margin-top: 2px;
-}
-
-// ============ TAGS CONTAINER ============
-
-.tagsContainer {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    padding: 0 24px 24px;
-    overflow: hidden;
-}
-
-.topActions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 8px 16px;
-}
-
-.progressInfo {
     display: flex;
     flex-direction: column;
     gap: 6px;
-}
-
-.filledText {
-    font-size: 13px;
-    font-weight: 500;
-    color: #a1a1aa;
-}
-
-.miniProgress {
-    width: 140px;
-    height: 6px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 3px;
-    overflow: hidden;
-}
-
-.miniFill {
-    height: 100%;
-    background: linear-gradient(to right, #6366f1, #a855f7);
-    border-radius: 3px;
-    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.reUploadBtn {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 8px 12px;
-    border-radius: 8px;
-    color: #e2e8f0;
-    font-size: 12px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
+    transition: all 0.2s;
 
     &:hover {
-        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(99, 102, 241, 0.2);
+    }
+
+    label {
+        font-size: 10px;
+        font-weight: 700;
+        color: #52525b;
+        text-transform: uppercase;
     }
 }
 
-.statusLine {
-    font-size: 12px;
-    padding: 10px 14px;
-    background: rgba(99, 102, 241, 0.1);
-    border-left: 3px solid #6366f1;
-    color: #c7d2fe;
-    margin: 0 8px 16px;
-    border-radius: 0 4px 4px 0;
-}
-
-.scrollArea {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0 8px;
-    margin-right: -8px;
-
-    &::-webkit-scrollbar {
-        width: 6px;
-    }
-
-    &::-webkit-scrollbar-track {
-        background: transparent;
-    }
-
-    &::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 3px;
-    }
-}
-
-.categoryBlock {
-    margin-bottom: 24px;
-}
-
-.categoryTitle {
+.valDisplay {
     font-size: 14px;
-    font-weight: 600;
-    color: #71717a;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 12px;
-}
-
-.tagGrid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 12px;
-}
-
-.tagCard {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 14px;
-    padding: 16px 18px;
+    color: #e2e8f0;
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    transition: all 0.2s;
-    min-height: 95px;
-    box-sizing: border-box;
+    align-items: center;
+    cursor: text;
+    min-height: 24px;
 
-    &:hover {
-        background: rgba(255, 255, 255, 0.05);
-        border-color: rgba(255, 255, 255, 0.15);
+    span {
+        color: #3f3f46;
+        font-style: italic;
+    }
+
+    .editIcon {
+        color: #3f3f46;
+        opacity: 0;
+        transition: opacity 0.2s;
     }
 }
 
-.tagEmpty {
-    border: 1px dashed rgba(255, 255, 255, 0.15);
+.nexusTagCard:hover .editIcon {
+    opacity: 1;
 }
 
-.tagInfo {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.tagLabel {
-    font-size: 11px;
-    font-weight: 600;
-    color: #71717a;
-}
-
-.tagValue {
-    font-size: 14px;
-    color: #e2e8f0;
-    cursor: text;
-    min-height: 20px;
-}
-
-.placeholderText {
-    color: #4b5563;
-    font-style: italic;
-}
-
-.tagInput,
-.tagSelect {
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid #6366f1;
-    border-radius: 6px;
+.nexusTagCard input {
+    background: none;
+    border: none;
     color: #fff;
     font-size: 14px;
-    padding: 4px 8px;
-    width: 100%;
     outline: none;
-    box-sizing: border-box;
+    width: 100%;
+    padding: 2px 0;
+    border-bottom: 1px solid #6366f1;
+}
+
+.selectWrapper {
+    position: relative;
+    width: 100%;
+}
+
+.tagSelect {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 14px;
+    outline: none;
+    width: 100%;
+    padding: 2px 24px 2px 0; // Space for arrow
+    border-bottom: 1px solid #6366f1;
+    cursor: pointer;
+    appearance: none; // Remove default arrow
 
     option {
         background: #18181b;
@@ -520,175 +894,550 @@
     }
 }
 
-.tagAction {
-    background: none;
-    border: none;
-    color: #4b5563;
-    cursor: pointer;
-    padding: 4px;
-    border-radius: 4px;
-
-    &:hover {
-        color: #ef4444;
-        background: rgba(239, 68, 68, 0.1);
-    }
+.selectArrow {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6366f1;
+    pointer-events: none;
 }
 
-// ============ FOOTER ACTIONS ============
+// ============ SYNC ZONE ============
 
-.footerActions {
-    display: flex;
-    gap: 12px;
-    padding: 12px 8px 8px;
-    margin-top: 6px;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.addBtn {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 12px 20px;
-    border-radius: 12px;
-    color: #a1a1aa;
-    font-size: 14px;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    cursor: pointer;
-
-    &:hover {
-        background: rgba(255, 255, 255, 0.08);
-        color: #fff;
-    }
-}
-
-.saveBtnLarge {
-    flex: 1;
-    background: linear-gradient(to right, #6366f1, #a855f7);
-    border: none;
-    padding: 12px;
-    border-radius: 12px;
-    color: #fff;
-    font-size: 15px;
-    font-weight: 600;
+.syncZone {
+    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
+}
+
+.uploadCard {
+    width: 100%;
+    max-width: 400px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 2px dashed rgba(255, 255, 255, 0.05);
+    border-radius: 24px;
+    padding: 60px 40px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    transition: all 0.3s;
+
+    &:hover {
+        background: rgba(99, 102, 241, 0.04);
+        border-color: #6366f1;
+        transform: translateY(-4px);
+    }
+
+    .uploadIcon {
+        color: #6366f1;
+        margin-bottom: 8px;
+    }
+
+    h3 {
+        font-size: 18px;
+        font-weight: 800;
+        margin: 0;
+    }
+
+    p {
+        font-size: 14px;
+        color: #71717a;
+        margin: 0;
+    }
+}
+
+.nexusActionBtn {
+    margin-top: 12px;
+    padding: 12px 24px;
+    background: #6366f1;
+    border: none;
+    border-radius: 12px;
+    color: #fff;
+    font-weight: 700;
     cursor: pointer;
-    box-shadow: 0 10px 20px rgba(99, 102, 241, 0.2);
     transition: all 0.2s;
 
-    &:hover:not(:disabled) {
+    &:hover {
+        background: #4f46e5;
         transform: translateY(-2px);
-        box-shadow: 0 15px 30px rgba(99, 102, 241, 0.3);
+    }
+}
+
+// ============ FOOTER ============
+
+.nexusFooter {
+    padding: 24px 60px;
+    background: rgba(9, 9, 11, 0.8);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.footerInfo {
+    font-size: 12px;
+    font-weight: 700;
+    color: #52525b;
+    letter-spacing: 0.1em;
+}
+
+.saveNexusBtn {
+    background: #6366f1;
+    color: #fff;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.2s;
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+
+    &:hover:not(:disabled) {
+        background: #4f46e5;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+    }
+
+    &:active:not(:disabled) {
+        transform: translateY(0);
     }
 
     &:disabled {
         opacity: 0.5;
         cursor: not-allowed;
+        background: #3f3f46;
+        box-shadow: none;
     }
 }
 
 // ============ MODALS ============
 
-.modalOverlay {
+// ============ NEURAL CORE SETTINGS ============
+
+.settingsZone {
+    display: flex;
+    justify-content: center;
+    align-items: center; // Center vertically by default
+    padding: 0; // Remove extra padding to rely on parent or inner
+    width: 100%;
+    min-height: 100%;
+}
+
+.settingsCard {
+    width: 100%;
+    max-width: 540px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 24px;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(10px);
+
+    @media (max-width: 1024px) {
+        width: 90%; // Fluid width for smaller devices
+        max-width: 400px;
+        padding: 24px; // Reduce padding further
+        gap: 20px;
+    }
+}
+
+.configSaveBtn {
+    margin-top: 8px;
+    width: 100%;
+    padding: 16px;
+    background: #fff;
+    border: none;
+    border-radius: 14px;
+    color: #000;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 20px rgba(255, 255, 255, 0.1);
+
+    &:hover {
+        background: #f4f4f5;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(255, 255, 255, 0.2);
+    }
+
+    &:active {
+        transform: translateY(0);
+    }
+}
+
+.settingsHeader {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+
+    .coreIcon {
+        color: #6366f1;
+    }
+
+    h3 {
+        font-size: 20px;
+        font-weight: 700;
+        color: #fff;
+        margin: 0 0 4px;
+    }
+
+    p {
+        font-size: 13px;
+        color: #71717a;
+        margin: 0;
+    }
+}
+
+.providerGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 8px;
+}
+
+.providerBtn {
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    color: #52525b;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: #a1a1aa;
+    }
+}
+
+.providerActive {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: rgba(99, 102, 241, 0.5);
+    color: #fff;
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.1);
+}
+
+.recommendBadge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #6366f1;
+    color: #fff;
+    font-size: 8px;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 6px;
+    box-shadow: 0 4px 10px rgba(99, 102, 241, 0.4);
+}
+
+.keyManagement {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.keyInputGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    .keyHeader {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+
+        label {
+            font-size: 11px;
+            font-weight: 800;
+            color: #52525b;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .getKeyLink {
+            background: none;
+            border: none;
+            color: #6366f1;
+            font-size: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: all 0.2s;
+
+            &:hover {
+                color: #fff;
+                background: rgba(99, 102, 241, 0.1);
+            }
+        }
+    }
+
+    input {
+        width: 100%;
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        padding: 14px 16px;
+        color: #fff;
+        font-family: inherit;
+        font-size: 14px;
+        transition: all 0.2s;
+
+        &:focus {
+            outline: none;
+            border-color: rgba(99, 102, 241, 0.5);
+            background: rgba(0, 0, 0, 0.3);
+        }
+    }
+}
+
+.creditStats {
+    display: flex;
+    gap: 16px;
+}
+
+.statBox {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    color: #a1a1aa;
+    position: relative;
+
+    .statusDot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        position: absolute;
+        top: 12px;
+        right: 12px;
+    }
+
+    .connected {
+        background: #10b981;
+        box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+    }
+
+    .loading {
+        background: #f59e0b;
+    }
+
+    .error {
+        background: #ef4444;
+    }
+
+    .missing {
+        background: #52525b;
+    }
+}
+
+.modalBackdrop {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(5px);
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(12px);
+    z-index: 1000;
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
+    animation: fadeIn 0.2s ease-out;
 }
 
-.addModal {
+.nexusModal {
     width: 400px;
     background: #18181b;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 20px;
-    padding: 24px;
+    border-radius: 28px;
+    padding: 40px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 24px;
 
     h3 {
-        margin: 0 0 8px;
         font-size: 18px;
+        font-weight: 900;
+        margin: 0;
+        text-align: center;
     }
 
     input {
-        background: rgba(0, 0, 0, 0.3);
+        background: #09090b;
         border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 10px;
-        padding: 12px;
+        border-radius: 12px;
+        padding: 16px;
         color: #fff;
+        font-size: 16px;
         outline: none;
+        cursor: text !important;
+        pointer-events: auto !important;
+        caret-color: #6366f1 !important;
+        -webkit-user-select: text !important;
+        user-select: text !important;
+        opacity: 1 !important;
 
         &:focus {
             border-color: #6366f1;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        &::placeholder {
+            color: #3f3f46;
         }
     }
 }
 
-.modalBtns {
+.modalActions {
     display: flex;
-    justify-content: flex-end;
     gap: 12px;
-    margin-top: 8px;
+    justify-content: flex-end;
 
     button {
-        background: none;
-        border: none;
-        color: #71717a;
-        padding: 8px 16px;
+        padding: 12px 24px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 700;
         cursor: pointer;
-        font-weight: 500;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #71717a;
+        transition: all 0.2s;
+
+        &:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.2);
+        }
     }
 
     .confirmBtn {
-        background: #6366f1;
-        color: white;
-        border-radius: 8px;
+        background: #fff;
+        color: #000;
+        border: none;
+        font-weight: 800;
+
+        &:hover {
+            background: #e4e4e7;
+            transform: translateY(-2px);
+        }
+
+        &:active {
+            transform: translateY(0);
+        }
     }
 }
 
-.privacyFooter {
-    margin-top: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    color: #52525b;
-    font-size: 11px;
-}
+.deleteModal {
+    border-color: rgba(239, 68, 68, 0.2);
+    box-shadow: 0 0 40px rgba(239, 68, 68, 0.1);
 
-.loadingSection {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 20px;
-    color: #a1a1aa;
-}
+    .warningHeader {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        text-align: center;
+        padding-top: 10px;
 
-.spinnerLarge {
-    width: 40px;
-    height: 40px;
-    border: 3px solid rgba(99, 102, 241, 0.1);
-    border-top-color: #6366f1;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
+        .warningIcon {
+            color: #ef4444;
+            filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.4));
+        }
 
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
+        h3 {
+            color: #ef4444;
+            letter-spacing: 2px;
+            font-size: 16px;
+            font-weight: 900;
+        }
+    }
+
+    .deleteWarning {
+        color: #a1a1aa;
+        text-align: center;
+        line-height: 1.6;
+        font-size: 14px;
+        margin: 0;
+
+        strong {
+            color: #fff;
+            background: rgba(239, 68, 68, 0.15);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+    }
+
+    .modalActions {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        margin-top: 10px;
+
+        button {
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .decommissionBtn {
+            background: #ef4444;
+            color: #fff;
+            border: none;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+
+            &:hover {
+                background: #dc2626;
+                transform: translateY(-2px);
+                box-shadow: 0 8px 25px rgba(239, 68, 68, 0.5);
+            }
+
+            &:active {
+                transform: translateY(0);
+            }
+        }
+
+        .cancelBtn {
+            background: rgba(255, 255, 255, 0.03);
+            color: #71717a;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+
+            &:hover {
+                background: rgba(255, 255, 255, 0.08);
+                color: #fff;
+                border-color: rgba(255, 255, 255, 0.2);
+            }
+        }
     }
 }

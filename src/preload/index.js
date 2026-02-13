@@ -52,4 +52,17 @@ contextBridge.exposeInMainWorld('intentoAPI', {
     onHudUpdate: (callback) => {
         ipcRenderer.on('hud:update', (_event, text) => callback(text));
     },
+    onBrainUpdate: (callback) => {
+        ipcRenderer.on('brain:update', (_event, status) => callback(status));
+    },
+
+    // HUD Control
+    hudShow: (text) => ipcRenderer.invoke('hud:show', { text }),
+    hudHide: () => ipcRenderer.invoke('hud:hide'),
+
+    // Settings & Models
+    getAIConfig: () => ipcRenderer.invoke('getAIConfig'),
+    saveAIConfig: (config) => ipcRenderer.invoke('saveAIConfig', config),
+    getAICredits: (provider) => ipcRenderer.invoke('getAICredits', provider),
+    openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
 });

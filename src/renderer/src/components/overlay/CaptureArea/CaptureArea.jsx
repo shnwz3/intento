@@ -1,4 +1,4 @@
-import { Camera } from 'lucide-react';
+import { Camera, RefreshCcw } from 'lucide-react';
 import styles from './CaptureArea.module.scss';
 
 /**
@@ -10,15 +10,20 @@ export default function CaptureArea({ screenshot, onCapture }) {
     <div
       className={`${styles.captureArea} ${screenshot ? styles.hasScreenshot : ''}`}
       onClick={onCapture}
-      title="Click to capture screen"
+      title={screenshot ? "Click to Retake" : "Capture Intent"}
     >
       <Camera size={20} className={styles.icon} />
       {screenshot && (
-        <img
-          src={screenshot}
-          alt="Screenshot"
-          className={styles.thumbnail}
-        />
+        <>
+          <img
+            src={screenshot}
+            alt="Screenshot"
+            className={styles.thumbnail}
+          />
+          <div className={styles.overlay}>
+            <RefreshCcw size={18} className={styles.refreshIcon} />
+          </div>
+        </>
       )}
     </div>
   );

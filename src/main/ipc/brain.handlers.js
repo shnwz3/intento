@@ -1,4 +1,4 @@
-const { ipcMain, dialog } = require('electron');
+const { ipcMain, dialog, BrowserWindow } = require('electron');
 const { getBrain, getVision } = require('./vision.handlers');
 const { createBrainWindow, closeBrainWindow } = require('../windows/brainWindow');
 
@@ -8,6 +8,22 @@ const { createBrainWindow, closeBrainWindow } = require('../windows/brainWindow'
  */
 function registerBrainHandlers(isDev) {
     const brain = getBrain();
+
+    // Helper to notify all windows of brain updates
+    const notifyBrainUpdate = () => {
+        const active = brain.getActiveBrain();
+        const status = {
+            hasContext: brain.hasContext(),
+            tagCount: brain.getTagCount(),
+            filledCount: brain.getFilledCount(),
+            activeName: active ? active.name : 'No Brain',
+            activeId: active ? active.id : null
+        };
+
+        BrowserWindow.getAllWindows().forEach(win => {
+            win.webContents.send('brain:update', status);
+        });
+    };
 
     // Open Brain Window
     ipcMain.handle('brain:open', () => {
@@ -23,7 +39,9 @@ function registerBrainHandlers(isDev) {
             ],
         });
         if (result.canceled) return { success: false, error: 'cancelled' };
-        return brain.uploadDocument(result.filePaths[0]);
+        const uploadResult = await brain.uploadDocument(result.filePaths[0]);
+        if (uploadResult.success) notifyBrainUpdate();
+        return uploadResult;
     });
 
     // Extract tags from document text using AI, then MERGE into existing defaults
@@ -70,6 +88,7 @@ ${documentText.substring(0, 4000)}`;
 
             // Merge extracted into existing defaults
             const mergeResult = brain.mergeExtractedTags(extractedTags);
+            notifyBrainUpdate();
             return { success: true, tags: mergeResult.tags, extracted: extractedTags.length };
         } catch (err) {
             return { success: false, error: err.message };
@@ -77,7 +96,11 @@ ${documentText.substring(0, 4000)}`;
     });
 
     // Save tags
-    ipcMain.handle('brain:saveTags', (_event, tags) => brain.saveTags(tags));
+    ipcMain.handle('brain:saveTags', (_event, tags) => {
+        const result = brain.saveTags(tags);
+        if (result.success) notifyBrainUpdate();
+        return result;
+    });
 
     // Get all tags (includes defaults)
     ipcMain.handle('brain:getTags', () => ({
@@ -86,24 +109,44 @@ ${documentText.substring(0, 4000)}`;
     }));
 
     // Add single tag
-    ipcMain.handle('brain:addTag', (_event, { label, value }) => brain.addTag(label, value));
+    ipcMain.handle('brain:addTag', (_event, { label, value }) => {
+        const result = brain.addTag(label, value);
+        if (result.success) notifyBrainUpdate();
+        return result;
+    });
 
     // Update tag
-    ipcMain.handle('brain:updateTag', (_event, { id, value }) => brain.updateTag(id, value));
+    ipcMain.handle('brain:updateTag', (_event, { id, value }) => {
+        const result = brain.updateTag(id, value);
+        if (result.success) notifyBrainUpdate();
+        return result;
+    });
 
     // Delete tag
-    ipcMain.handle('brain:deleteTag', (_event, { id }) => brain.deleteTag(id));
+    ipcMain.handle('brain:deleteTag', (_event, { id }) => {
+        const result = brain.deleteTag(id);
+        if (result.success) notifyBrainUpdate();
+        return result;
+    });
 
     // Get brain status
-    ipcMain.handle('brain:status', () => ({
-        hasContext: brain.hasContext(),
-        tagCount: brain.getTagCount(),
-        filledCount: brain.getFilledCount(),
-    }));
+    ipcMain.handle('brain:status', () => {
+        const active = brain.getActiveBrain();
+        return {
+            hasContext: brain.hasContext(),
+            tagCount: brain.getTagCount(),
+            filledCount: brain.getFilledCount(),
+            activeName: active ? active.name : 'No Brain',
+            activeId: active ? active.id : null
+        };
+    });
 
     // Legacy
     ipcMain.handle('brain:save', async (_event, data) => {
-        if (data.tags) brain.saveTags(data.tags);
+        if (data.tags) {
+            brain.saveTags(data.tags);
+            notifyBrainUpdate();
+        }
         closeBrainWindow();
         return { success: true };
     });
@@ -117,22 +160,30 @@ ${documentText.substring(0, 4000)}`;
 
     // Create a new brain
     ipcMain.handle('brain:create', (_event, { name }) => {
-        return brain.createBrain(name);
+        const result = brain.createBrain(name);
+        if (result.success) notifyBrainUpdate();
+        return result;
     });
 
     // Delete a brain
     ipcMain.handle('brain:delete', (_event, { id }) => {
-        return brain.deleteBrain(id);
+        const result = brain.deleteBrain(id);
+        if (result.success) notifyBrainUpdate();
+        return result;
     });
 
     // Rename a brain
     ipcMain.handle('brain:rename', (_event, { id, newName }) => {
-        return brain.renameBrain(id, newName);
+        const result = brain.renameBrain(id, newName);
+        if (result.success) notifyBrainUpdate();
+        return result;
     });
 
     // Switch active brain
     ipcMain.handle('brain:setActive', (_event, { id }) => {
-        return brain.setActiveBrain(id);
+        const result = brain.setActiveBrain(id);
+        if (result.success) notifyBrainUpdate();
+        return result;
     });
 
     ipcMain.handle('doc:upload', async () => {
@@ -141,7 +192,9 @@ ${documentText.substring(0, 4000)}`;
             filters: [{ name: 'Documents', extensions: ['pdf', 'txt', 'json'] }],
         });
         if (result.canceled) return { success: false, error: 'cancelled' };
-        return brain.uploadDocument(result.filePaths[0]);
+        const uploadResult = await brain.uploadDocument(result.filePaths[0]);
+        if (uploadResult.success) notifyBrainUpdate();
+        return uploadResult;
     });
 
     console.log('📡 Brain IPC handlers registered (tag system with defaults)');

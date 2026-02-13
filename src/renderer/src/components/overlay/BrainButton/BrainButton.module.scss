@@ -8,6 +8,11 @@
     &.hasDoc {
         background: $accent-brain;
         box-shadow: 0 0 10px $accent-brain-glow;
+
+        &:hover {
+            background: $accent-brain-glow;
+            box-shadow: 0 0 15px $accent-brain-glow;
+        }
     }
 }
 
@@ -21,4 +26,25 @@
     padding: 2px 4px;
     border-radius: 4px;
     font-weight: bold;
+}
+
+.processing {
+    background: linear-gradient(135deg, #6366f1, #a855f7) !important;
+    color: #fff !important;
+    box-shadow: 0 0 15px rgba(168, 85, 247, 0.6) !important;
+    animation: pulse-brain 2s infinite;
+}
+
+@keyframes pulse-brain {
+    0% {
+        box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.7);
+    }
+
+    70% {
+        box-shadow: 0 0 0 10px rgba(168, 85, 247, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(168, 85, 247, 0);
+    }
 }

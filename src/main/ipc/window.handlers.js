@@ -1,5 +1,5 @@
 const { ipcMain } = require('electron');
-const { getMainWindow } = require('../windows/mainWindow');
+const { getMainWindow, showHud, hideHud } = require('../windows/mainWindow');
 
 /**
  * Register window control IPC handlers
@@ -17,6 +17,14 @@ function registerWindowHandlers() {
             win.show();
             win.focus();
         }
+    });
+
+    ipcMain.handle('hud:show', (_event, { text }) => {
+        showHud(text);
+    });
+
+    ipcMain.handle('hud:hide', () => {
+        hideHud();
     });
 
     console.log('📡 Window IPC handlers registered');
