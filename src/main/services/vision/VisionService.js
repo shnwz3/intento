@@ -88,7 +88,14 @@ class VisionService {
 
             try {
                 console.log(`🤖 Trying ${provider.name}...`);
-                const raw = await provider.call(base64, userPrompt);
+
+                // Implement 15s timeout per provider
+                const responsePromise = provider.call(base64, userPrompt);
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('TIMEOUT')), 15000)
+                );
+
+                const raw = await Promise.race([responsePromise, timeoutPromise]);
                 const cleaned = cleanText(raw);
 
                 if (isRefusal(cleaned)) {
@@ -96,7 +103,7 @@ class VisionService {
                     continue;
                 }
                 if (isLowQuality(cleaned)) {
-                    console.log(`⚠️ ${provider.name} returned low-quality: "${cleaned}". Trying next...`);
+                    console.log(`⚠️ ${provider.name} returned an empty response. Trying next...`);
                     continue;
                 }
 
@@ -104,14 +111,19 @@ class VisionService {
                 this.currentIndex = idx;
                 return { success: true, response: cleaned };
             } catch (err) {
-                console.warn(`⚠️ ${provider.name} failed:`, err.message);
-                if ([401, 402, 429].includes(err.status) || err.message.includes('quota')) {
+                if (err.message === 'TIMEOUT') {
+                    console.warn(`⏳ ${provider.name} timed out after 15s`);
+                } else {
+                    console.warn(`⚠️ ${provider.name} failed:`, err.message);
+                }
+
+                if ([401, 402, 429].includes(err.status) || err.message.includes('quota') || err.message === 'TIMEOUT') {
                     continue;
                 }
             }
         }
 
-        return { success: false, error: 'All AI providers failed. Please try again.' };
+        return { success: false, error: 'AI timed out or failed. Please try again.' };
     }
 
     isReady() {

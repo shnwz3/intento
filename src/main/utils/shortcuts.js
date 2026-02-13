@@ -84,19 +84,21 @@ async function triggerFieldFillMode() {
         const response = await smartWriterService.autoFill(captureResult);
 
         hudManager.stopCycle();
-        hudManager.show(`${WAND_ICON} Value generated!`);
+        hudManager.show(`${WAND_ICON} &nbsp; Intent Generated!`);
         await new Promise(r => setTimeout(r, 800));
 
         // 3. Output
         const typing = getTyping();
-        await hudManager.startCountdown(2, 'Intento executing in', false);
+        await hudManager.startCountdown(2, 'Executing your intent in', false);
 
         await typeWithCancellation(typing, response);
         hudManager.reset();
 
     } catch (err) {
-        hudManager.reset();
+        hudManager.show(`${WAND_ICON} Sorry, try again`);
         console.error('❌ Silent execution failed:', err.message);
+        await new Promise(r => setTimeout(r, 2000));
+        hudManager.reset();
     }
 }
 
@@ -129,7 +131,7 @@ async function triggerFixGrammarMode() {
         const fixedText = await smartWriterService.rewrite(selectedText, captureResult);
 
         hudManager.stopCycle();
-        hudManager.show(`${WAND_ICON} Grammar fixed!`);
+        hudManager.show(`${WAND_ICON} &nbsp; Grammar fixed!`);
         await new Promise(r => setTimeout(r, 800));
 
         // 4. Output
@@ -139,8 +141,10 @@ async function triggerFixGrammarMode() {
         hudManager.reset();
 
     } catch (err) {
-        hudManager.reset();
+        hudManager.show(`${WAND_ICON} Sorry, try again`);
         console.error('❌ Fix Grammar mode failed:', err.message);
+        await new Promise(r => setTimeout(r, 2000));
+        hudManager.reset();
     }
 }
 
@@ -167,7 +171,7 @@ async function typeWithCancellation(typing, text) {
         const result = await typing.typeAtCursor(text);
 
         if (!result.success && result.error === 'Cancelled by user') {
-            hudManager.show(`${WAND_ICON} Stopped`);
+            hudManager.show(`${WAND_ICON} &nbsp; Stopped`);
             await new Promise(r => setTimeout(r, 1000));
         }
     } finally {

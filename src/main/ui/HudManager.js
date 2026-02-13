@@ -29,6 +29,8 @@ class HudManager {
         });
 
         this.hudWindow.setIgnoreMouseEvents(true);
+        // Prevent HUD from appearing in screenshots/screen recordings
+        this.hudWindow.setContentProtection(true);
 
         if (!require('electron').app.isPackaged) {
             this.hudWindow.loadURL('http://localhost:5173/hud.html');
@@ -93,7 +95,7 @@ class HudManager {
 
         this.cycleInterval = setInterval(() => {
             index = (index + 1) % messages.length;
-            this.show(`${SPINNER} ${messages[index]}`);
+            this.show(`${SPINNER} &nbsp; ${messages[index]}`);
         }, 2000);
     }
 

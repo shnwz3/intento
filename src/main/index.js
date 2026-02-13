@@ -50,7 +50,7 @@ app.whenReady().then(async () => {
         setTimeout(() => createBrainWindow(isDev), 1000);
     }
 
-    console.log('✅ Intento ready!');
+    console.log('✅ Intento: Your Intent, Executed');
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
