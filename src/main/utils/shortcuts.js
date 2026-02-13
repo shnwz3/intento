@@ -21,11 +21,10 @@ function registerShortcuts() {
         console.error('Failed to load services for shortcuts:', e.message);
     }
 
-    // Ctrl+Alt+I - Intelligence Mode (open overlay + capture)
-    globalShortcut.register('CommandOrControl+Alt+I', triggerImageMode);
+    // Ctrl+Alt+C - Intelligence Mode (open overlay + capture)
+    globalShortcut.register('CommandOrControl+Alt+C', triggerImageMode);
 
-    // Ctrl+Alt+T - Direct Reply (screenshot → AI → type response)
-    globalShortcut.register('CommandOrControl+Alt+T', triggerDirectTextMode);
+
 
     // Ctrl+Alt+Right - Field Fill (screenshot → AI → type in field)
     globalShortcut.register('CommandOrControl+Alt+Right', triggerFieldFillMode);
@@ -33,7 +32,7 @@ function registerShortcuts() {
     // Ctrl+Alt+F - Fix Grammar (screenshot + selection → AI → fix text)
     globalShortcut.register('CommandOrControl+Alt+F', triggerFixGrammarMode);
 
-    console.log('⌨️ Global shortcuts registered: Ctrl+Alt+I, Ctrl+Alt+T, Ctrl+Alt+Right, Ctrl+Alt+F');
+    console.log('⌨️ Global shortcuts registered: Ctrl+Alt+C, Ctrl+Alt+Right, Ctrl+Alt+F');
 }
 
 function unregisterShortcuts() {
@@ -43,11 +42,11 @@ function unregisterShortcuts() {
 // ============ SHORTCUT HANDLERS ============
 
 /**
- * Ctrl+Alt+I: Intelligence Mode
+ * Ctrl+Alt+C: Intelligence Mode
  * Show the main overlay and trigger capture
  */
 async function triggerImageMode() {
-    console.log('📸 Ctrl+Alt+I: Intelligence triggered');
+    console.log('📸 Ctrl+Alt+C: Intelligence triggered');
     const win = getMainWindow();
 
     if (win) {
@@ -58,49 +57,7 @@ async function triggerImageMode() {
     }
 }
 
-/**
- * Ctrl+Alt+T: Direct Text Mode
- * Screenshot → AI generates reply → Types at cursor
- */
-async function triggerDirectTextMode() {
-    console.log('⌨️ Ctrl+Alt+T: Direct Typing triggered');
 
-    try {
-        // 1. Screenshot
-        const captureResult = await captureScreenSafely();
-        if (!captureResult) return;
-
-        // 2. Get Input
-        const typing = getTyping();
-        const selectedText = await typing.getSelectedText();
-
-        // 3. Process
-        const messages = [
-            'Reading screen context...',
-            'Analyzing conversation...',
-            'Drafting a witty reply...',
-            'Polishing tone...',
-            'Almost there...'
-        ];
-        hudManager.startCycle(messages);
-
-        const response = await smartWriterService.reply(selectedText, captureResult);
-
-        hudManager.stopCycle();
-        hudManager.show(`${WAND_ICON} Reply generated!`);
-        await new Promise(r => setTimeout(r, 800)); // Show success briefly
-
-        // 4. Output
-        await hudManager.startCountdown(5, 'Position cursor! Typing in', false);
-        hudManager.show(`${WAND_ICON} Typing...`);
-        await typing.typeAtCursor(response);
-        hudManager.hide();
-
-    } catch (err) {
-        hudManager.hide();
-        console.error('❌ Direct text mode failed:', err.message);
-    }
-}
 
 /**
  * Ctrl+Alt+F: Field Fill Mode
@@ -133,12 +90,12 @@ async function triggerFieldFillMode() {
         // 3. Output
         const typing = getTyping();
         await hudManager.startCountdown(2, 'Intento executing in', false);
-        hudManager.show(`${WAND_ICON} Typing...`);
-        await typing.typeAtCursor(response);
-        hudManager.hide();
+
+        await typeWithCancellation(typing, response);
+        hudManager.reset();
 
     } catch (err) {
-        hudManager.hide();
+        hudManager.reset();
         console.error('❌ Silent execution failed:', err.message);
     }
 }
@@ -177,13 +134,45 @@ async function triggerFixGrammarMode() {
 
         // 4. Output
         await hudManager.startCountdown(2, 'Pasting fixed text...', false);
-        hudManager.show(`${WAND_ICON} Typing...`);
-        await typing.typeAtCursor(fixedText);
-        hudManager.hide();
+
+        await typeWithCancellation(typing, fixedText);
+        hudManager.reset();
 
     } catch (err) {
-        hudManager.hide();
+        hudManager.reset();
         console.error('❌ Fix Grammar mode failed:', err.message);
+    }
+}
+
+/**
+ * Helper to handle safe typing with cancellation
+ * @param {TypingService} typing
+ * @param {string} text
+ */
+async function typeWithCancellation(typing, text) {
+    if (!text) return;
+
+    // Register Escape to cancel
+    const cancelShortcut = globalShortcut.register('Escape', () => {
+        console.log('🛑 Escape pressed: Cancelling typing...');
+        typing.cancel();
+    });
+
+    if (!cancelShortcut) {
+        console.warn('⚠️ Failed to register Escape shortcut for cancellation');
+    }
+
+    try {
+        hudManager.show(`${WAND_ICON} Typing... (Esc to stop)`);
+        const result = await typing.typeAtCursor(text);
+
+        if (!result.success && result.error === 'Cancelled by user') {
+            hudManager.show(`${WAND_ICON} Stopped`);
+            await new Promise(r => setTimeout(r, 1000));
+        }
+    } finally {
+        // Always unregister Escape
+        globalShortcut.unregister('Escape');
     }
 }
 

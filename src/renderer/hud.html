@@ -35,9 +35,15 @@
             justify-content: center;
             gap: 10px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-            animation: slideUp 0.3s ease-out;
+            /* animation: slideUp 0.3s ease-out; Removed to prevent conflict */
             white-space: nowrap;
             max-width: 95%;
+            overflow: hidden;
+            /* Important for width animation */
+        }
+
+        .hud-container.resizing {
+            transition: width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), height 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
 
         .spinner {
@@ -74,6 +80,28 @@
             }
         }
 
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.02);
+            }
+
+            70% {
+                transform: scale(0.98);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .pulse {
+            animation: pulse 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
         .lucide {
             width: 16px;
             height: 16px;
@@ -85,15 +113,57 @@
 
 <body>
     <div class="hud-container">
-        <div class="spinner"></div>
         <span class="hud-text" id="hudText">Ready</span>
     </div>
     <script>
         const { ipcRenderer } = require('electron');
         const hudText = document.getElementById('hudText');
+        const container = document.querySelector('.hud-container');
+
+        const SCOUT_ICON = `<div class="spinner"></div>`;
 
         ipcRenderer.on('hud:update', (_event, text) => {
+            // 1. Lock current dimensions
+            const startWidth = container.offsetWidth;
+            const startHeight = container.offsetHeight;
+
+            // Apply fixed size to prevent jump
+            container.style.width = `${startWidth}px`;
+            container.style.height = `${startHeight}px`;
+
+            // 2. Change content
             hudText.innerHTML = text;
+
+            // 3. Measure & Animate
+            requestAnimationFrame(() => {
+                // Temporarily unlock to measure new natural size
+                container.style.width = 'auto';
+                container.style.height = 'auto';
+
+                const targetWidth = container.offsetWidth;
+                const targetHeight = container.offsetHeight;
+
+                // Re-lock to start dimensions
+                container.style.width = `${startWidth}px`;
+                container.style.height = `${startHeight}px`;
+
+                // Force layout reflow
+                void container.offsetWidth;
+
+                // Add transition class and set final dimensions
+                container.classList.add('resizing');
+                container.style.width = `${targetWidth}px`;
+                container.style.height = `${targetHeight}px`;
+            });
+        });
+
+        // Clean up after transition
+        container.addEventListener('transitionend', (e) => {
+            if (e.propertyName === 'width') {
+                container.classList.remove('resizing');
+                container.style.width = 'auto';
+                container.style.height = 'auto';
+            }
         });
     </script>
 </body>

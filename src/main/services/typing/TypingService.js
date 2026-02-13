@@ -1,6 +1,13 @@
 const robot = require('@jitsi/robotjs');
 const ClipboardManager = require('./ClipboardManager');
 
+class TypingCancelledError extends Error {
+    constructor() {
+        super('Typing cancelled by user');
+        this.name = 'TypingCancelledError';
+    }
+}
+
 /**
  * TypingService - Handles smart text input at cursor position
  * Supports Unicode, consecutive duplicate chars, and clipboard fallback
@@ -8,6 +15,15 @@ const ClipboardManager = require('./ClipboardManager');
 class TypingService {
     constructor() {
         this.clipboard = new ClipboardManager();
+        this._isCancelled = false;
+    }
+
+    /**
+     * Cancel any ongoing typing operation
+     */
+    cancel() {
+        console.log('🚫 Typing cancellation requested');
+        this._isCancelled = true;
     }
 
     /**
@@ -17,6 +33,7 @@ class TypingService {
      * @returns {Promise<{success: boolean, error?: string}>}
      */
     async typeAtCursor(text, countdown = 0) {
+        this._isCancelled = false; // Reset flag at start
         try {
             // Copy to clipboard as fallback (user can Ctrl+V if typing fails)
             this.clipboard.write(text);
@@ -25,6 +42,10 @@ class TypingService {
             await this._typeTextSmart(text);
             return { success: true };
         } catch (err) {
+            if (err instanceof TypingCancelledError) {
+                console.log('🚫 Typing stopped gracefully.');
+                return { success: false, error: 'Cancelled by user' };
+            }
             console.error('Typing failed:', err.message);
             return { success: false, error: err.message };
         }
@@ -74,6 +95,8 @@ class TypingService {
         const chunks = text.match(/[\x00-\x7F]+|[^\x00-\x7F]+/g) || [];
 
         for (const chunk of chunks) {
+            if (this._isCancelled) throw new TypingCancelledError();
+
             if (this._containsUnicode(chunk)) {
                 await this._pasteUnicode(chunk);
             } else {
@@ -90,6 +113,8 @@ class TypingService {
     async _typeASCII(text) {
         let prevChar = '';
         for (const char of text) {
+            if (this._isCancelled) throw new TypingCancelledError();
+
             if (char === prevChar) {
                 await this._sleep(60);
                 robot.keyTap(char.toLowerCase());
@@ -107,6 +132,8 @@ class TypingService {
      * @private
      */
     async _pasteUnicode(text) {
+        if (this._isCancelled) throw new TypingCancelledError();
+
         const previous = this.clipboard.read();
         try {
             this.clipboard.write(text);
