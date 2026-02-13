@@ -46,6 +46,12 @@ export default function MainOverlay() {
   const handleSend = useCallback(async () => {
     if (!screenshot && !prompt) return;
 
+    if (!screenshot) {
+      window.intentoAPI.hudShow('⚠️ Please capture an image first!');
+      setTimeout(() => window.intentoAPI.hudReset(), 3000);
+      return;
+    }
+
     setIsLoading(true);
     // Show HUD to remind user to place cursor
     window.intentoAPI.hudShow('Intento thinking... Place cursor for output!');

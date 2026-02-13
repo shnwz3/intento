@@ -1,5 +1,6 @@
 const { ipcMain } = require('electron');
 const TypingService = require('../services/typing/TypingService');
+const hudManager = require('../ui/HudManager');
 
 const typing = new TypingService();
 
@@ -9,8 +10,7 @@ const typing = new TypingService();
 function registerTypingHandlers() {
     ipcMain.handle('text:typeAtCursor', async (_event, { text, countdown = 0 }) => {
         if (countdown > 0) {
-            const { startCountdown } = require('../windows/mainWindow');
-            await startCountdown(countdown, 'Place cursor! Typing in');
+            await hudManager.startCountdown(countdown, 'Place cursor! Typing in');
         }
         return typing.typeAtCursor(text, 0);
     });

@@ -59,6 +59,7 @@ contextBridge.exposeInMainWorld('intentoAPI', {
     // HUD Control
     hudShow: (text) => ipcRenderer.invoke('hud:show', { text }),
     hudHide: () => ipcRenderer.invoke('hud:hide'),
+    hudReset: () => ipcRenderer.invoke('hud:reset'),
 
     // Settings & Models
     getAIConfig: () => ipcRenderer.invoke('getAIConfig'),

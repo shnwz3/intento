@@ -53,7 +53,7 @@ function isRefusal(text) {
 }
 
 /**
- * Check if the response is too short or robotic
+ * Check if the response is empty or invalid
  * @param {string} text
  * @returns {boolean}
  */
@@ -61,22 +61,9 @@ function isLowQuality(text) {
     if (!text) return true;
     const clean = text.trim();
 
-    // Hard length gate
-    if (clean.length < 5) return true;
-
-    // Robotic signatures
-    const roboticSignatures = [
-        'got it', 'i understand', 'i will', 'done.', 'ok.', 'sure.',
-        'no problem', 'here is', 'the screen', 'it seems', 'message box',
-        'at the bottom',
-    ];
-    const lower = clean.toLowerCase();
-
-    return roboticSignatures.some((phrase) => {
-        if (lower === phrase || lower === phrase + '.') return true;
-        if (lower.startsWith(phrase) && clean.length < 35) return true;
-        return false;
-    });
+    // Accept any non-empty response. 
+    // We no longer abort for short answers like "Yes" or "No".
+    return clean.length === 0;
 }
 
 module.exports = { cleanText, isRefusal, isLowQuality };
