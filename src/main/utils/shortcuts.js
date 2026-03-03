@@ -50,10 +50,13 @@ async function triggerImageMode() {
     const win = getMainWindow();
 
     if (win) {
-        win.show();
-        win.restore();
-        win.focus();
-        win.webContents.send('shortcut:image-mode');
+        if (!win.isMinimized()) {
+            win.minimize();
+        } else {
+            win.restore();
+            win.focus();
+            win.webContents.send('shortcut:image-mode');
+        }
     }
 }
 

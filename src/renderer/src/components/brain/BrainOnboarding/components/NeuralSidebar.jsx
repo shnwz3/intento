@@ -1,5 +1,6 @@
 import { Zap, Plus, LayoutGrid, Settings, X } from 'lucide-react';
 import styles from '../BrainOnboarding.module.scss';
+import { PROVIDER_METADATA } from '../constants';
 
 export default function NeuralSidebar({ 
   brains, 
@@ -11,6 +12,10 @@ export default function NeuralSidebar({
   aiConfig, 
   apiCredits 
 }) {
+  const activeProviderName = aiConfig?.activeProvider 
+    ? (PROVIDER_METADATA[aiConfig.activeProvider]?.name || aiConfig.activeProvider.toUpperCase())
+    : 'NO API SET';
+
   return (
     <aside className={styles.sidebar}>
       <div className={styles.sidebarHeader}>
@@ -29,7 +34,7 @@ export default function NeuralSidebar({
           <div 
             key={b.id} 
             className={`${styles.brainNavItem} ${b.isActive && activeTab !== 'settings' ? styles.navActive : ''}`}
-            onClick={() => { handleSwitchBrain(b.id); setActiveTab('identity'); }}
+            onClick={() => { handleSwitchBrain(b.id); setActiveTab('memory'); }}
           >
             <div className={styles.navBrainIcon}><LayoutGrid size={14} /></div>
             <div className={styles.navInfo}>
@@ -52,7 +57,7 @@ export default function NeuralSidebar({
            <div className={styles.navBrainIcon}><Settings size={14} /></div>
            <div className={styles.navInfo}>
              <span className={styles.navName}>AI Settings</span>
-             <span className={styles.navMeta}>{aiConfig?.activeProvider?.toUpperCase() || 'API KEY Not Genarated'} • {apiCredits.balance}</span>
+             <span className={styles.navMeta}>{activeProviderName} • {apiCredits.balance}</span>
            </div>
          </div>
       </div>

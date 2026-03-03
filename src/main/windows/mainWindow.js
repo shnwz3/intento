@@ -33,6 +33,7 @@ function createMainWindow(isDev) {
         transparent: true,
         alwaysOnTop: true,
         resizable: false,
+        show: true, // Start visible so it shows in taskbar
         skipTaskbar: false,
         webPreferences: {
             preload: path.join(__dirname, '../../preload/index.js'),
@@ -40,6 +41,12 @@ function createMainWindow(isDev) {
             nodeIntegration: false,
         },
     });
+
+    // Center on primary display
+    mainWindow.center();
+
+    // Initial focus
+    mainWindow.focus();
 
     // Load React app
     if (isDev) {

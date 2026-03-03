@@ -4,8 +4,9 @@ const path = require('path');
 const { cleanText, isRefusal, isLowQuality } = require('./utils/textCleaner');
 
 const promptService = require('../../prompts/PromptService');
+const configService = require('../ConfigService');
 
-// Load AI Configuration
+// Load AI Configuration (system prompt & model params)
 let aiConfig = {
     system_prompt: promptService.SYSTEM_PROMPT,
     model_params: { max_tokens: 500, temperature: 0.75 },
@@ -21,8 +22,52 @@ try {
 }
 
 /**
+ * Provider base URLs and models for each supported API
+ */
+const PROVIDER_CONFIG = {
+    grok: {
+        name: 'Grok',
+        baseURL: 'https://api.groq.com/openai/v1',
+        visionModel: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        textModel: 'llama-3.3-70b-versatile',
+        type: 'openai-compatible',
+    },
+    openai: {
+        name: 'OpenAI',
+        baseURL: 'https://api.openai.com/v1',
+        visionModel: 'gpt-4o',
+        textModel: 'gpt-4o',
+        type: 'openai-compatible',
+    },
+    gemini: {
+        name: 'Gemini',
+        type: 'google-native',
+        visionModel: 'gemini-1.5-flash',
+        textModel: 'gemini-1.5-flash',
+    },
+    anthropic: {
+        name: 'Anthropic',
+        baseURL: 'https://api.anthropic.com/v1',
+        visionModel: 'claude-3-5-sonnet-20241022',
+        textModel: 'claude-3-5-sonnet-20241022',
+        type: 'openai-compatible',
+    },
+    openrouter: {
+        name: 'OpenRouter',
+        baseURL: 'https://openrouter.ai/api/v1',
+        visionModel: 'google/gemini-2.0-flash-exp:free',
+        textModel: 'google/gemini-2.0-flash-exp:free',
+        type: 'openai-compatible',
+        extraHeaders: {
+            'HTTP-Referer': 'https://github.com/intento-app',
+            'X-Title': 'Intento Vision',
+        },
+    },
+};
+
+/**
  * VisionService - Orchestrates AI vision providers
- * Primary: Grok API
+ * Reads API keys from ConfigService (user-configured via Settings UI)
  * Fallback: Ollama (local dev)
  */
 class VisionService {
@@ -33,26 +78,64 @@ class VisionService {
     }
 
     /**
-     * Build the list of available providers from environment
+     * Refresh providers when user changes API config from Settings UI
+     */
+    refreshProviders() {
+        this.providers = this._buildProviders();
+        this.currentIndex = 0;
+        console.log(`🔄 VisionService refreshed with ${this.providers.length} provider(s)`);
+    }
+
+    /**
+     * Build the list of available providers from ConfigService (electron-store)
+     * Falls back to process.env for backward compatibility
      * @returns {Array<{name: string, call: Function}>}
      */
     _buildProviders() {
         const providers = [];
-        const apiKey = process.env.GROK_API_KEY || process.env.OPENROUTER_API_KEY;
+        const config = configService.getConfig();
+        const activeProvider = config.activeProvider;
+        const activeKey = config.keys[activeProvider];
 
-        if (apiKey) {
-            if (apiKey.startsWith('gsk_')) {
-                providers.push({ name: 'Grok', call: (img, prompt) => this._callGrok(apiKey, img, prompt) });
-            } else if (apiKey.startsWith('AIza')) {
-                providers.push({ name: 'Gemini', call: (img, prompt) => this._callGemini(apiKey, img, prompt) });
-            } else if (apiKey.startsWith('sk-or-')) {
-                providers.push({ name: 'OpenRouter', call: (img, prompt) => this._callOpenRouter(apiKey, img, prompt) });
+        // 1. Try user-configured provider from Settings UI (priority)
+        if (activeKey && PROVIDER_CONFIG[activeProvider]) {
+            const providerCfg = PROVIDER_CONFIG[activeProvider];
+            if (providerCfg.type === 'google-native') {
+                providers.push({
+                    name: providerCfg.name,
+                    call: (img, prompt) => this._callGemini(activeKey, img, prompt),
+                });
             } else {
-                providers.push({ name: 'OpenAI-Compatible', call: (img, prompt) => this._callGrok(apiKey, img, prompt) });
+                providers.push({
+                    name: providerCfg.name,
+                    call: (img, prompt) => this._callOpenAICompatible(activeKey, providerCfg, img, prompt),
+                });
+            }
+            console.log(`🔑 Using ${providerCfg.name} from Settings UI`);
+        }
+
+        // 2. If no UI key set, also try other saved keys as fallbacks
+        if (!activeKey) {
+            for (const [providerId, key] of Object.entries(config.keys)) {
+                if (!key || providerId === activeProvider) continue;
+                const providerCfg = PROVIDER_CONFIG[providerId];
+                if (!providerCfg) continue;
+
+                if (providerCfg.type === 'google-native') {
+                    providers.push({
+                        name: providerCfg.name,
+                        call: (img, prompt) => this._callGemini(key, img, prompt),
+                    });
+                } else {
+                    providers.push({
+                        name: providerCfg.name,
+                        call: (img, prompt) => this._callOpenAICompatible(key, providerCfg, img, prompt),
+                    });
+                }
             }
         }
 
-        // Ollama fallback (always available for dev)
+        // 3. Ollama fallback (always available for dev)
         providers.push({ name: 'Ollama', call: (img, prompt) => this._callOllama(img, prompt) });
 
         return providers;
@@ -132,20 +215,26 @@ class VisionService {
 
     /**
      * Text-only AI call (no image) — used for document tag extraction
+     * Reads from ConfigService (user-configured keys)
      * @param {string} prompt
      * @returns {Promise<{success: boolean, response?: string, error?: string}>}
      */
     async analyzeTextOnly(prompt) {
-        const apiKey = process.env.GROK_API_KEY || process.env.OPENROUTER_API_KEY;
+        const config = configService.getConfig();
+        const activeProvider = config.activeProvider;
+        const apiKey = config.keys[activeProvider] || process.env.GROK_API_KEY || process.env.OPENROUTER_API_KEY;
+
         if (!apiKey) {
-            return { success: false, error: 'No API key configured' };
+            return { success: false, error: 'No API key configured. Go to AI Engine settings to add your key.' };
         }
 
         try {
-            let baseURL = 'https://api.groq.com/openai/v1';
-            let model = 'llama-3.3-70b-versatile';
+            const providerCfg = PROVIDER_CONFIG[activeProvider] || PROVIDER_CONFIG.grok;
+            let baseURL = providerCfg.baseURL;
+            let model = providerCfg.textModel;
 
-            if (apiKey.startsWith('sk-or-')) {
+            // Fallback detection for env var keys
+            if (!config.keys[activeProvider] && apiKey.startsWith('sk-or-')) {
                 baseURL = 'https://openrouter.ai/api/v1';
                 model = 'google/gemini-2.0-flash-exp:free';
             }
@@ -171,16 +260,21 @@ class VisionService {
     // ============ PROVIDER IMPLEMENTATIONS ============
 
     /**
-     * Grok API call (OpenAI-compatible)
+     * Generic OpenAI-compatible API call (works for Grok, OpenAI, OpenRouter, Anthropic)
      */
-    async _callGrok(apiKey, base64Image, userPrompt) {
-        const client = new OpenAI({
+    async _callOpenAICompatible(apiKey, providerCfg, base64Image, userPrompt) {
+        const clientOpts = {
             apiKey,
-            baseURL: 'https://api.groq.com/openai/v1',
-        });
+            baseURL: providerCfg.baseURL,
+        };
+        if (providerCfg.extraHeaders) {
+            clientOpts.defaultHeaders = providerCfg.extraHeaders;
+        }
+
+        const client = new OpenAI(clientOpts);
 
         const response = await client.chat.completions.create({
-            model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+            model: providerCfg.visionModel,
             messages: [
                 { role: 'system', content: aiConfig.system_prompt },
                 {
@@ -215,41 +309,6 @@ class VisionService {
         ]);
 
         return (await result.response).text();
-    }
-
-    /**
-     * OpenRouter API call
-     */
-    async _callOpenRouter(apiKey, base64Image, userPrompt) {
-        const client = new OpenAI({
-            apiKey,
-            baseURL: 'https://openrouter.ai/api/v1',
-            defaultHeaders: {
-                'HTTP-Referer': 'https://github.com/intento-app',
-                'X-Title': 'Intento Vision',
-            },
-        });
-
-        const response = await client.chat.completions.create({
-            model: 'google/gemini-2.0-flash-exp:free',
-            messages: [
-                { role: 'system', content: aiConfig.system_prompt },
-                {
-                    role: 'user',
-                    content: [
-                        { type: 'text', text: userPrompt },
-                        {
-                            type: 'image_url',
-                            image_url: { url: `data:image/png;base64,${base64Image}` },
-                        },
-                    ],
-                },
-            ],
-            max_tokens: aiConfig.model_params.max_tokens || 500,
-            temperature: aiConfig.model_params.temperature || 0.7,
-        });
-
-        return response.choices[0].message.content;
     }
 
     /**

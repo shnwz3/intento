@@ -22,11 +22,19 @@ contextBridge.exposeInMainWorld('intentoAPI', {
         ipcRenderer.invoke('brain:extractTags', { documentText }),
     brainSaveTags: (tags) => ipcRenderer.invoke('brain:saveTags', tags),
     brainGetTags: () => ipcRenderer.invoke('brain:getTags'),
-    brainAddTag: (label, value) =>
-        ipcRenderer.invoke('brain:addTag', { label, value }),
-    brainUpdateTag: (id, value) =>
-        ipcRenderer.invoke('brain:updateTag', { id, value }),
+
+    // Tag CRUD
+    brainAddTag: (headingId, label, value) =>
+        ipcRenderer.invoke('brain:addTag', { headingId, label, value }),
+    brainUpdateTag: (id, updates) =>
+        ipcRenderer.invoke('brain:updateTag', { id, ...updates }),
     brainDeleteTag: (id) => ipcRenderer.invoke('brain:deleteTag', { id }),
+
+    // Heading CRUD
+    brainAddHeading: (label, section) => ipcRenderer.invoke('brain:addHeading', { label, section }),
+    brainUpdateHeading: (id, label) => ipcRenderer.invoke('brain:updateHeading', { id, label }),
+    brainDeleteHeading: (id) => ipcRenderer.invoke('brain:deleteHeading', { id }),
+
     getBrainStatus: () => ipcRenderer.invoke('brain:status'),
 
     // Multi-Brain Profile Management

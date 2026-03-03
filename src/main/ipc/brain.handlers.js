@@ -48,25 +48,38 @@ function registerBrainHandlers(isDev) {
     ipcMain.handle('brain:extractTags', async (_event, { documentText }) => {
         const vision = getVision();
 
-        // Build the extraction prompt with our known tag labels
-        const defaultLabels = brain.getDefaults().map((t) => t.label);
-
+        // New Hierarchical Extraction Prompt
         const extractionPrompt = `You are a data extraction engine. Read the following document and extract structured information about this person.
+        
+        Group the information into logical HEADINGS (Categories).
+        
+        REQUIRED FORMAT:
+        Return ONLY a valid JSON array of objects. Each object represents a HEADING and contains a list of TAGS.
+        
+        Example JSON Structure:
+        [
+          {
+            "category": "Identity",
+            "tags": [
+              { "label": "Full Name", "value": "John Doe" },
+              { "label": "Email", "value": "john@example.com" }
+            ]
+          },
+          {
+            "category": "Professional",
+            "tags": [
+              { "label": "Role", "value": "Software Engineer" },
+              { "label": "Skills", "value": "React, Node.js" }
+            ]
+          }
+        ]
 
-REQUIRED LABELS TO FILL (use these exact labels):
-${defaultLabels.map((l) => `- ${l}`).join('\n')}
+        - Create Headings that make sense for the data (e.g., Identity, Work Experience, Education, soft Skills).
+        - Extract as much relevant detail as possible.
+        - Ignore generic boilerplate text.
 
-Also extract any OTHER relevant information not in the list above.
-
-Return ONLY a valid JSON array of objects with "label" and "value" keys.
-For labels you cannot find in the document, DO NOT include them.
-Only include labels where the document provides clear information.
-
-CRITICAL: Return ONLY the JSON array, no markdown, no explanation. Example:
-[{"label":"Full Name","value":"John Doe"},{"label":"Key Skills","value":"React, Node.js"}]
-
-DOCUMENT:
-${documentText.substring(0, 4000)}`;
+        DOCUMENT:
+        ${documentText.substring(0, 8000)}`;
 
         try {
             const result = await vision.analyzeTextOnly(extractionPrompt);
@@ -75,49 +88,74 @@ ${documentText.substring(0, 4000)}`;
             }
 
             // Parse JSON from AI response
-            let extractedTags;
+            let extractedData;
             try {
                 let cleaned = result.response.trim();
+                // Basic cleanup for markdown code blocks
                 if (cleaned.startsWith('```')) {
                     cleaned = cleaned.replace(/```json?\n?/g, '').replace(/```/g, '');
                 }
-                extractedTags = JSON.parse(cleaned);
+                extractedData = JSON.parse(cleaned);
             } catch (parseErr) {
-                return { success: false, error: 'AI returned invalid format. Try again.' };
+                console.error('AI JSON Parse Error:', parseErr);
+                console.log('Raw response:', result.response);
+                return { success: false, error: 'AI returned invalid format. Try again.', raw: result.response };
             }
 
             // Merge extracted into existing defaults
-            const mergeResult = brain.mergeExtractedTags(extractedTags);
+            const mergeResult = brain.mergeExtractedData(extractedData);
             notifyBrainUpdate();
-            return { success: true, tags: mergeResult.tags, extracted: extractedTags.length };
+            return { success: true, tags: mergeResult.active.tags, headings: mergeResult.active.headings, extracted: extractedData.length };
         } catch (err) {
             return { success: false, error: err.message };
         }
     });
 
-    // Save tags
+    // Save tags (full sync)
     ipcMain.handle('brain:saveTags', (_event, tags) => {
         const result = brain.saveTags(tags);
         if (result.success) notifyBrainUpdate();
         return result;
     });
 
-    // Get all tags (includes defaults)
-    ipcMain.handle('brain:getTags', () => ({
-        tags: brain.getTags(),
-        filledCount: brain.getFilledCount(),
-    }));
+    // Get all tags AND headings
+    ipcMain.handle('brain:getTags', () => {
+        const data = brain.getTagsAndHeadings();
+        return {
+            tags: data.tags,
+            headings: data.headings,
+            filledCount: brain.getFilledCount(),
+        };
+    });
+
+    // --- Heading CRUD ---
+    ipcMain.handle('brain:addHeading', (_event, { label }) => {
+        return brain.addHeading(label);
+    });
+
+    ipcMain.handle('brain:updateHeading', (_event, { id, label }) => {
+        return brain.updateHeading(id, label);
+    });
+
+    ipcMain.handle('brain:deleteHeading', (_event, { id }) => {
+        const result = brain.deleteHeading(id);
+        if (result.success) notifyBrainUpdate();
+        return result;
+    });
+
+    // --- Tag CRUD ---
 
     // Add single tag
-    ipcMain.handle('brain:addTag', (_event, { label, value }) => {
-        const result = brain.addTag(label, value);
+    ipcMain.handle('brain:addTag', (_event, { headingId, label, value }) => {
+        const result = brain.addTag(headingId, label, value);
         if (result.success) notifyBrainUpdate();
         return result;
     });
 
     // Update tag
-    ipcMain.handle('brain:updateTag', (_event, { id, value }) => {
-        const result = brain.updateTag(id, value);
+    ipcMain.handle('brain:updateTag', (_event, { id, ...updates }) => {
+        // updates can contain value, label, headingId
+        const result = brain.updateTag(id, updates);
         if (result.success) notifyBrainUpdate();
         return result;
     });
@@ -197,7 +235,7 @@ ${documentText.substring(0, 4000)}`;
         return uploadResult;
     });
 
-    console.log('📡 Brain IPC handlers registered (tag system with defaults)');
+    console.log('📡 Brain IPC handlers registered (dynamic headings supported)');
 }
 
 module.exports = { registerBrainHandlers };

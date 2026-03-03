@@ -7,7 +7,18 @@ function registerSettingsHandlers() {
     });
 
     ipcMain.handle('saveAIConfig', async (event, config) => {
-        return configService.saveConfig(config);
+        const result = configService.saveConfig(config);
+
+        // Refresh VisionService providers so the new key takes effect immediately
+        try {
+            const serviceManager = require('../services/ServiceManager');
+            const vision = serviceManager.get('VisionService');
+            vision.refreshProviders();
+        } catch (e) {
+            console.warn('⚠️ Could not refresh VisionService:', e.message);
+        }
+
+        return result;
     });
 
     ipcMain.handle('getAICredits', async (event, provider) => {
@@ -21,3 +32,4 @@ function registerSettingsHandlers() {
 }
 
 module.exports = { registerSettingsHandlers };
+
