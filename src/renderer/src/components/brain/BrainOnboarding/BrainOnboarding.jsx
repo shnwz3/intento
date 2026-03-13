@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import styles from './BrainOnboarding.module.scss';
-import { Menu, ChevronLeft, Upload, Plus, Save } from 'lucide-react';
+import { Menu, ChevronLeft, ChevronDown, Upload, Plus, Save } from 'lucide-react';
 
 // Drag & Drop
 import {
@@ -50,6 +50,7 @@ export default function BrainOnboarding() {
     const [headings, setHeadings] = useState([]);
     const [activeTab, setActiveTab] = useState('identity'); // 'identity', 'personality', 'sync', 'settings'
     const [activeAgentId, setActiveAgentId] = useState('no_agent');
+    const [showVoiceSettings, setShowVoiceSettings] = useState(false);
     const [status, setStatus] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -91,6 +92,17 @@ export default function BrainOnboarding() {
                 setTags(data.tags || []);
                 setHeadings(data.headings || []);
                 setActiveAgentId(data.activeAgentId || 'no_agent');
+
+                // Auto-open Voice & Style only if this brain's persona traits have values
+                let hasTraits = false;
+                const pHead = (data.headings || []).find(h => h.section === 'personality');
+                if (pHead) {
+                    const traitLabels = ['Communication Tone', 'Personality Traits', 'Reply Style'];
+                    hasTraits = (data.tags || []).some(
+                        t => t.headingId === pHead.id && traitLabels.includes(t.label) && t.value && t.value.trim() !== ''
+                    );
+                }
+                setShowVoiceSettings(hasTraits);
             }
         } catch (error) {
             console.error('Failed to load brain data:', error);
@@ -428,16 +440,10 @@ export default function BrainOnboarding() {
                                         {tab.label}
                                     </button>
                                 ))}
-                             </div>
-                             
-                             {activeTab !== 'settings' && activeTab !== 'sync' && activeTab !== 'personality' && (
-                                 <button className={styles.nexusActionBtn} onClick={() => setIsAddingHeading(true)} style={{marginLeft: 12}}>
-                                    <Plus size={14} /> HEADING
-                                 </button>
-                             )}
-                         </div>
-                    </div>
-                </div>
+                         </div>{/* tabNav */}
+                         </div>{/* controlsRight */}
+                    </div>{/* nexusHeader */}
+                </div>{/* nexusControls */}
 
                 {/* Main Content Area */}
                 <section className={styles.neuralZone}>
@@ -465,16 +471,6 @@ export default function BrainOnboarding() {
                                 return await window.intentoAPI.getAICredits(providerId);
                             }}
                         />
-                    ) : activeTab === 'sync' ? (
-                         // Upload Tab
-                         <div className={styles.syncZone}>
-                            <div className={styles.uploadCard}>
-                                <Upload size={40} className={styles.uploadIcon} />
-                                <h3>Ingest New Info</h3>
-                                <p>Upload PDFs to automatically extract headings and tags into your Brain.</p>
-                                <button className={styles.nexusActionBtn} onClick={handleDocUpload}>Select Document</button>
-                            </div>
-                        </div>
                     ) : (
                         // HEADINGS VIEW (Identity or Personality)
                         // HEADINGS VIEW (Identity or Personality)
@@ -505,50 +501,64 @@ export default function BrainOnboarding() {
                                         ))}
                                     </div>
 
-                                    <div className={styles.personaDivider}>
-                                        <span>DYNAMIC TRAITS (OVERRIDE)</span>
+                                    <div 
+                                        className={styles.personaDivider} 
+                                        onClick={() => setShowVoiceSettings(!showVoiceSettings)}
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        <span>Voice & Style</span>
+                                        <ChevronDown 
+                                            size={14} 
+                                            style={{ 
+                                                color: '#52525b', 
+                                                transition: 'transform 0.3s',
+                                                transform: showVoiceSettings ? 'rotate(180deg)' : 'rotate(0)'
+                                            }} 
+                                        />
                                     </div>
 
-                                    <div className={styles.traitsGrid}>
-                                        {['Communication Tone', 'Personality Traits', 'Reply Style'].map(tagName => {
-                                            const personaHeading = headings.find(h => h.section === 'personality');
-                                            const currentTag = tags.find(t => t.headingId === personaHeading?.id && t.label === tagName);
-                                            const currentValue = currentTag?.value || '';
+                                    {showVoiceSettings && (
+                                        <div className={styles.traitsGrid}>
+                                            {['Communication Tone', 'Personality Traits', 'Reply Style'].map(tagName => {
+                                                const personaHeading = headings.find(h => h.section === 'personality');
+                                                const currentTag = tags.find(t => t.headingId === personaHeading?.id && t.label === tagName);
+                                                const currentValue = currentTag?.value || '';
 
-                                            return (
-                                                <div key={tagName} className={styles.traitControl}>
-                                                    <label>{tagName}</label>
-                                                    <select
-                                                        value={currentValue}
-                                                        onChange={async (e) => {
-                                                            const newVal = e.target.value;
-                                                            let pHeading = headings.find(h => h.section === 'personality');
-                                                            if (!pHeading) {
-                                                                const res = await window.intentoAPI.brainAddHeading('Persona', 'personality');
-                                                                if (res.success) {
-                                                                    setHeadings(prev => [...prev, res.heading]);
-                                                                    pHeading = res.heading;
-                                                                } else return;
-                                                            }
-                                                            
-                                                            if (currentTag) {
-                                                                await window.intentoAPI.brainUpdateTag(currentTag.id, { value: newVal });
-                                                                setTags(prev => prev.map(t => t.id === currentTag.id ? { ...t, value: newVal } : t));
-                                                            } else {
-                                                                const res = await window.intentoAPI.brainAddTag(pHeading.id, tagName, newVal);
-                                                                if (res.success) setTags(prev => [...prev, res.tag]);
-                                                            }
-                                                        }}
-                                                    >
-                                                        <option value="">Select...</option>
-                                                        {TAG_OPTIONS[tagName]?.map(opt => (
-                                                            <option key={opt} value={opt}>{opt}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
+                                                return (
+                                                    <div key={tagName} className={styles.traitControl}>
+                                                        <label>{tagName}</label>
+                                                        <select
+                                                            value={currentValue}
+                                                            onChange={async (e) => {
+                                                                const newVal = e.target.value;
+                                                                let pHeading = headings.find(h => h.section === 'personality');
+                                                                if (!pHeading) {
+                                                                    const res = await window.intentoAPI.brainAddHeading('Persona', 'personality');
+                                                                    if (res.success) {
+                                                                        setHeadings(prev => [...prev, res.heading]);
+                                                                        pHeading = res.heading;
+                                                                    } else return;
+                                                                }
+                                                                
+                                                                if (currentTag) {
+                                                                    await window.intentoAPI.brainUpdateTag(currentTag.id, { value: newVal });
+                                                                    setTags(prev => prev.map(t => t.id === currentTag.id ? { ...t, value: newVal } : t));
+                                                                } else {
+                                                                    const res = await window.intentoAPI.brainAddTag(pHeading.id, tagName, newVal);
+                                                                    if (res.success) setTags(prev => [...prev, res.tag]);
+                                                                }
+                                                            }}
+                                                        >
+                                                            <option value="">Select...</option>
+                                                            {TAG_OPTIONS[tagName]?.map(opt => (
+                                                                <option key={opt} value={opt}>{opt}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                            ) : (
                                 // IDENTITY TAB (Generic Drag & Drop)
@@ -559,6 +569,14 @@ export default function BrainOnboarding() {
                                     onDragEnd={handleDragEnd}
                                 >
                                     <div className={styles.headingsContainer}>
+                                        <div style={{display: 'flex', gap: 8, marginBottom: 16}}>
+                                            <button className={styles.nexusActionBtn} onClick={() => setIsAddingHeading(true)}>
+                                                <Plus size={14} /> HEADING
+                                            </button>
+                                            <button className={styles.nexusActionBtn} onClick={handleDocUpload}>
+                                                <Upload size={14} /> PDF
+                                            </button>
+                                        </div>
                                         {isAddingHeading && (
                                             <div className={styles.headingSection} style={{ borderStyle: 'dashed' }}>
                                                 <div className={styles.headingHeader}>
@@ -579,10 +597,15 @@ export default function BrainOnboarding() {
 
                                         {getHeadingsForTab().length === 0 && !isAddingHeading ? (
                                             <div className={styles.neuralLoading} style={{minHeight: '200px', opacity: 0.5}}>
-                                                <p>No headings in this section.</p>
-                                                <button className={styles.addTagBtn} onClick={() => setIsAddingHeading(true)}>
-                                                    <Plus size={16} /> Add Personal Info Heading
-                                                </button>
+                                                <p>No personal info yet. Start by adding headings or upload a PDF.</p>
+                                                <div style={{display: 'flex', gap: 12, marginTop: 12}}>
+                                                    <button className={styles.addTagBtn} onClick={() => setIsAddingHeading(true)}>
+                                                        <Plus size={16} /> Add Heading
+                                                    </button>
+                                                    <button className={styles.addTagBtn} onClick={handleDocUpload}>
+                                                        <Upload size={16} /> Upload PDF
+                                                    </button>
+                                                </div>
                                             </div>
                                         ) : (
                                             getHeadingsForTab().map(heading => (

@@ -1,15 +1,11 @@
 import {
     ShieldCheck,
-    Sparkles,
-    Upload,
-    Settings
+    Sparkles
 } from 'lucide-react';
 
 export const TABS = [
     { id: 'identity', label: 'Personal Info', icon: ShieldCheck },
-    { id: 'personality', label: 'Persona', icon: Sparkles },
-    { id: 'sync', label: 'Upload New Info', icon: Upload },
-    { id: 'settings', label: 'AI Engine', icon: Settings }
+    { id: 'personality', label: 'Persona', icon: Sparkles }
 ];
 
 export const PROVIDER_METADATA = {

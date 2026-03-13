@@ -23,6 +23,20 @@ function createBrainWindow(isDev) {
 
     if (isDev) {
         brainWindow.loadURL('http://localhost:5173/brain.html');
+
+        // Register local shortcuts for the window (since menu is null)
+        brainWindow.webContents.on('before-input-event', (event, input) => {
+            if (input.type === 'keyDown') {
+                // F12 or Cmd/Ctrl+Shift+I
+                const isToggleAction = input.key === 'F12' ||
+                    ((input.control || input.meta) && input.shift && input.key.toLowerCase() === 'i');
+
+                if (isToggleAction) {
+                    brainWindow.webContents.toggleDevTools();
+                    event.preventDefault();
+                }
+            }
+        });
     } else {
         brainWindow.loadFile(path.join(__dirname, '../../dist/brain.html'));
     }

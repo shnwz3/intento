@@ -1,0 +1,48 @@
+# Security & Privacy Assessment: Intento AI
+
+## 🚨 Executive Summary
+**Current Status:** ⚠️ **High Privacy Risk**
+You asked if the app is risky because it sends personal chat screenshots to AI. **The short answer is: Yes.**
+
+As currently implemented, the application captures **full-screen screenshots** and sends them to third-party cloud providers (OpenAI, Grok, Google Gemini). This means any private information visible on your screen (chats, emails, passwords, usernames, sensitive documents) is transmitted to these external servers.
+
+---
+
+## 🔍 Detailed Findings
+
+### 1. Data Transmission
+- **What is sent:** The app captures the **entire primary monitor** (Reference: [context_service.py](file:///c:/Users/FEROZ%20RAHIL/Desktop/Intento/intento-app/python/services/context_service.py), line 98). It does not currently restrict capturing to just the active window or a specific region.
+- **Where it goes:**
+  - **VisionService.js:** Sends images to **Grok**, **Google Gemini**, or **OpenRouter** depending on your API key.
+  - **context_service.py:** Sends images directly to **OpenAI** (`gpt-4o`).
+- **Encryption:** Data is likely sent over HTTPS (secure in transit), but the *content* is accessible to the AI provider for processing.
+
+### 2. The Risks
+1.  **PII Leakage:** If you have WhatsApp, Slack, or iMessage open, the AI reads *everything* visible in the screenshot to verify context. This includes contact names, phone numbers, and message content.
+2.  **Data Retention:**
+    - **OpenAI / Google / Grok:** Depending on their terms of service, they may retain API data for 30 days for "abuse monitoring" or potentially use it for model training (unless you are on an Enterprise plan that explicitly opts out).
+    - **Third-Party Proxies:** Services like OpenRouter are intermediaries that also handle your data.
+3.  **Inadvertent Capture:** Since [context_service.py](file:///c:/Users/FEROZ%20RAHIL/Desktop/Intento/intento-app/python/services/context_service.py) grabs `sct.monitors[1]` (the full screen), if you have a banking window open side-by-side with your chat, the banking window is also sent to the AI.
+
+---
+
+## 🛡️ Recommended Mitigations
+
+To make the app secure and "production-ready" for privacy-conscious users, I recommend implementing the following:
+
+### Phase 1: Immediate Fixes (Low Effort)
+- [ ] **Crop to Window:** Modify [context_service.py](file:///c:/Users/FEROZ%20RAHIL/Desktop/Intento/intento-app/python/services/context_service.py) to only capture the *active window* (`window_rect`) instead of the full screen. This isolates the context to the app you are using.
+- [ ] **Privacy Mode Toggle:** Add a "Privacy Mode" switch in the UI that prevents screenshots and falls back to text-only context (copy-pasting text).
+
+### Phase 2: Privacy Enhancements (Medium Effort)
+- [ ] **PII Redaction:** Implement a local pre-processing step (using a lightweight local model or library) to blur text that looks like phone numbers or emails *before* sending the image to the cloud.
+- [ ] **Blur Background:** If capturing the full screen is necessary, blur everything except the active window.
+
+### Phase 3: Ultimate Privacy (High Effort)
+- [ ] **Local-Only Mode:** Fully enable the **Ollama** fallback.
+  - Your code already has [_callOllama](file:///c:/Users/FEROZ%20RAHIL/Desktop/Intento/intento-app/src/main/services/vision/VisionService.js#255-268) support!
+  - **Benefit:** Images never leave your computer.
+  - **Trade-off:** You need a powerful GPU, and local models (like `llava` or `moondream`) are not as smart as GPT-4o yet.
+
+## Conclusion
+For a personal prototype, this architecture is standard. But if you plan to release this to users, the privacy risk is a major blocker. You must at minimum **crop to the active window** and update your Privacy Policy to explicitly state which AI providers receive user data.

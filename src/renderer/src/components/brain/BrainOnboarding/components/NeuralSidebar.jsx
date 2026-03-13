@@ -34,7 +34,7 @@ export default function NeuralSidebar({
           <div 
             key={b.id} 
             className={`${styles.brainNavItem} ${b.isActive && activeTab !== 'settings' ? styles.navActive : ''}`}
-            onClick={() => { handleSwitchBrain(b.id); setActiveTab('memory'); }}
+            onClick={() => { handleSwitchBrain(b.id); setActiveTab('identity'); }}
           >
             <div className={styles.navBrainIcon}><LayoutGrid size={14} /></div>
             <div className={styles.navInfo}>
