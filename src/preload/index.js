@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld('intentoAPI', {
     brainRenameProfile: (id, newName) =>
         ipcRenderer.invoke('brain:rename', { id, newName }),
     brainSetActive: (id) => ipcRenderer.invoke('brain:setActive', { id }),
+    brainSetActiveAgent: (agentId) => ipcRenderer.invoke('brain:setActiveAgent', { agentId }),
 
     // Legacy brain
     saveBrain: (data) => ipcRenderer.invoke('brain:save', data),

@@ -30,6 +30,7 @@ import DeleteConfirmModal from './components/DeleteConfirmModal';
 // Constants
 import { TABS, TAG_OPTIONS } from './constants';
 import { PERSONALITY_TEMPLATES } from '../personalityTemplates';
+import { AGENTS } from '../AgentRegistry';
 
 const dropAnimation = {
     sideEffects: defaultDropAnimationSideEffects({
@@ -48,6 +49,7 @@ export default function BrainOnboarding() {
     const [tags, setTags] = useState([]);
     const [headings, setHeadings] = useState([]);
     const [activeTab, setActiveTab] = useState('identity'); // 'identity', 'personality', 'sync', 'settings'
+    const [activeAgentId, setActiveAgentId] = useState('no_agent');
     const [status, setStatus] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -88,6 +90,7 @@ export default function BrainOnboarding() {
                 const data = await window.intentoAPI.brainGetTags();
                 setTags(data.tags || []);
                 setHeadings(data.headings || []);
+                setActiveAgentId(data.activeAgentId || 'no_agent');
             }
         } catch (error) {
             console.error('Failed to load brain data:', error);
@@ -112,6 +115,13 @@ export default function BrainOnboarding() {
     useEffect(() => {
         loadBrainData();
         loadAIConfig();
+
+        // Sync state when backend broadcasts updates
+        window.intentoAPI.onBrainUpdate((status) => {
+            if (status.activeAgentId) {
+                setActiveAgentId(status.activeAgentId);
+            }
+        });
     }, [loadBrainData, loadAIConfig]);
 
 
@@ -312,6 +322,15 @@ export default function BrainOnboarding() {
         }
     };
 
+    const handleSwitchAgent = async (agentId) => {
+        const res = await window.intentoAPI.brainSetActiveAgent(agentId);
+        if (res.success) {
+            setActiveAgentId(agentId);
+            setStatus(`Agent Activated: ${AGENTS.find(a => a.id === agentId)?.name}`);
+            setTimeout(() => setStatus(''), 2000);
+        }
+    };
+
     // --- AI Extraction ---
     const handleDocUpload = async () => {
         try {
@@ -461,67 +480,75 @@ export default function BrainOnboarding() {
                         // HEADINGS VIEW (Identity or Personality)
                         <>
                            {activeTab === 'personality' ? (
-                                <div className={styles.personaConfigContainer}>
-                                    {/* 1. Template Selector */}
-                                    <div className={styles.configRow} style={{marginBottom: 24}}>
-                                        <label>BASE PERSONA TEMPLATE</label>
-                                        <select 
-                                            className={styles.templateSelect}
-                                            onChange={(e) => {
-                                                const tmpl = PERSONALITY_TEMPLATES.find(t => t.id === e.target.value);
-                                                if (tmpl) handleApplyTemplate(tmpl);
-                                            }}
-                                            defaultValue=""
-                                        >
-                                            <option value="" disabled>Select a base persona...</option>
-                                            {PERSONALITY_TEMPLATES.map(t => (
-                                                <option key={t.id} value={t.id}>{t.name} — {t.description}</option>
-                                            ))}
-                                        </select>
+                                <div className={styles.agentHub}>
+                                    <div className={styles.agentGrid}>
+                                        {AGENTS.map(agent => (
+                                            <div 
+                                                key={agent.id} 
+                                                className={`${styles.agentCard} ${activeAgentId === agent.id ? styles.agentActive : ''}`}
+                                                onClick={() => handleSwitchAgent(agent.id)}
+                                            >
+                                                <div className={styles.agentIcon}>
+                                                    <agent.icon size={24} />
+                                                </div>
+                                                <div className={styles.agentInfo}>
+                                                    <h4>{agent.name}</h4>
+                                                    <p>{agent.description}</p>
+                                                    <div className={styles.agentSkills}>
+                                                        {agent.skills.map(skill => (
+                                                            <span key={skill} className={styles.skillBadge}>{skill}</span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                {activeAgentId === agent.id && <div className={styles.activeIndicator}>ACTIVE</div>}
+                                            </div>
+                                        ))}
                                     </div>
 
-                                    {/* 2. Distinct Tag Dropdowns */}
-                                    {['Communication Tone', 'Personality Traits', 'Reply Style'].map(tagName => {
-                                        // Find existing value
-                                        const personaHeading = headings.find(h => h.section === 'personality');
-                                        const currentTag = tags.find(t => t.headingId === personaHeading?.id && t.label === tagName);
-                                        const currentValue = currentTag?.value || '';
+                                    <div className={styles.personaDivider}>
+                                        <span>DYNAMIC TRAITS (OVERRIDE)</span>
+                                    </div>
 
-                                        return (
-                                            <div key={tagName} className={styles.configRow}>
-                                                <label>{tagName}</label>
-                                                <select
-                                                    value={currentValue}
-                                                    onChange={async (e) => {
-                                                        const newVal = e.target.value;
-                                                        // Ensure heading exists
-                                                        let pHeading = headings.find(h => h.section === 'personality');
-                                                        if (!pHeading) {
-                                                            const res = await window.intentoAPI.brainAddHeading('Persona', 'personality');
-                                                            if (res.success) {
-                                                                setHeadings(prev => [...prev, res.heading]);
-                                                                pHeading = res.heading;
-                                                            } else return;
-                                                        }
-                                                        
-                                                        // Upsert Tag
-                                                        if (currentTag) {
-                                                             await window.intentoAPI.brainUpdateTag(currentTag.id, { value: newVal });
-                                                             setTags(prev => prev.map(t => t.id === currentTag.id ? { ...t, value: newVal } : t));
-                                                        } else {
-                                                             const res = await window.intentoAPI.brainAddTag(pHeading.id, tagName, newVal);
-                                                             if (res.success) setTags(prev => [...prev, res.tag]);
-                                                        }
-                                                    }}
-                                                >
-                                                    <option value="">Select...</option>
-                                                    {TAG_OPTIONS[tagName]?.map(opt => (
-                                                        <option key={opt} value={opt}>{opt}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        );
-                                    })}
+                                    <div className={styles.traitsGrid}>
+                                        {['Communication Tone', 'Personality Traits', 'Reply Style'].map(tagName => {
+                                            const personaHeading = headings.find(h => h.section === 'personality');
+                                            const currentTag = tags.find(t => t.headingId === personaHeading?.id && t.label === tagName);
+                                            const currentValue = currentTag?.value || '';
+
+                                            return (
+                                                <div key={tagName} className={styles.traitControl}>
+                                                    <label>{tagName}</label>
+                                                    <select
+                                                        value={currentValue}
+                                                        onChange={async (e) => {
+                                                            const newVal = e.target.value;
+                                                            let pHeading = headings.find(h => h.section === 'personality');
+                                                            if (!pHeading) {
+                                                                const res = await window.intentoAPI.brainAddHeading('Persona', 'personality');
+                                                                if (res.success) {
+                                                                    setHeadings(prev => [...prev, res.heading]);
+                                                                    pHeading = res.heading;
+                                                                } else return;
+                                                            }
+                                                            
+                                                            if (currentTag) {
+                                                                await window.intentoAPI.brainUpdateTag(currentTag.id, { value: newVal });
+                                                                setTags(prev => prev.map(t => t.id === currentTag.id ? { ...t, value: newVal } : t));
+                                                            } else {
+                                                                const res = await window.intentoAPI.brainAddTag(pHeading.id, tagName, newVal);
+                                                                if (res.success) setTags(prev => [...prev, res.tag]);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <option value="">Select...</option>
+                                                        {TAG_OPTIONS[tagName]?.map(opt => (
+                                                            <option key={opt} value={opt}>{opt}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                            ) : (
                                 // IDENTITY TAB (Generic Drag & Drop)

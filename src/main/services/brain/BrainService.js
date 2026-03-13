@@ -13,6 +13,7 @@ class BrainService {
         this.brainPath = path.join(app.getPath('userData'), 'brain.json');
         this.brains = {};
         this.activeBrainId = 'default';
+        this.activeAgentId = 'no_agent';
         this._loadFromDisk();
     }
 
@@ -31,6 +32,7 @@ class BrainService {
                 if (data.brains) {
                     this.brains = data.brains;
                     this.activeBrainId = data.activeBrainId || 'default';
+                    this.activeAgentId = data.activeAgentId || 'no_agent';
                 } else if (data.tags) {
                     // Legacy single brain migration
                     this.brains = {
@@ -187,6 +189,7 @@ class BrainService {
         try {
             const data = {
                 activeBrainId: this.activeBrainId,
+                activeAgentId: this.activeAgentId,
                 brains: this.brains
             };
             fs.writeFileSync(this.brainPath, JSON.stringify(data, null, 2));
@@ -254,6 +257,18 @@ class BrainService {
 
     getActiveBrain() {
         return this.brains[this.activeBrainId];
+    }
+
+    // ============ AGENT MANAGEMENT ============
+
+    getActiveAgentId() {
+        return this.activeAgentId;
+    }
+
+    setActiveAgent(agentId) {
+        this.activeAgentId = agentId;
+        this._saveToDisk();
+        return { success: true, agentId };
     }
 
     // ============ HEADINGS CRUD ============

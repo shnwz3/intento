@@ -17,7 +17,8 @@ function registerBrainHandlers(isDev) {
             tagCount: brain.getTagCount(),
             filledCount: brain.getFilledCount(),
             activeName: active ? active.name : 'No Brain',
-            activeId: active ? active.id : null
+            activeId: active ? active.id : null,
+            activeAgentId: brain.getActiveAgentId()
         };
 
         BrowserWindow.getAllWindows().forEach(win => {
@@ -73,6 +74,7 @@ function registerBrainHandlers(isDev) {
             ]
           }
         ]
+        
 
         - Create Headings that make sense for the data (e.g., Identity, Work Experience, Education, soft Skills).
         - Extract as much relevant detail as possible.
@@ -125,6 +127,7 @@ function registerBrainHandlers(isDev) {
             tags: data.tags,
             headings: data.headings,
             filledCount: brain.getFilledCount(),
+            activeAgentId: brain.getActiveAgentId()
         };
     });
 
@@ -175,7 +178,8 @@ function registerBrainHandlers(isDev) {
             tagCount: brain.getTagCount(),
             filledCount: brain.getFilledCount(),
             activeName: active ? active.name : 'No Brain',
-            activeId: active ? active.id : null
+            activeId: active ? active.id : null,
+            activeAgentId: brain.getActiveAgentId()
         };
     });
 
@@ -220,6 +224,13 @@ function registerBrainHandlers(isDev) {
     // Switch active brain
     ipcMain.handle('brain:setActive', (_event, { id }) => {
         const result = brain.setActiveBrain(id);
+        if (result.success) notifyBrainUpdate();
+        return result;
+    });
+
+    // --- Agent Management ---
+    ipcMain.handle('brain:setActiveAgent', (_event, { agentId }) => {
+        const result = brain.setActiveAgent(agentId);
         if (result.success) notifyBrainUpdate();
         return result;
     });
