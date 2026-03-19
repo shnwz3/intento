@@ -8,8 +8,11 @@ on:
 jobs:
   release:
     runs-on: windows-latest
+    permissions:
+      contents: write # Needed for creating Releases
 
     steps:
+
       - name: Checkout Code
         uses: actions/checkout@v4
 
