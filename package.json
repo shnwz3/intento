@@ -1,7 +1,8 @@
 {
     "name": "intento-app",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Intento - AI-powered cursor assistant for intelligent text responses",
+
     "author": "Intento Team",
     "main": "src/main/index.js",
     "scripts": {
