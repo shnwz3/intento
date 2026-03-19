@@ -46,11 +46,13 @@ Download the latest installer for Windows from the **[Releases](https://github.c
 
 ## Supported AI Backends
 
+We recommend using the **Grok API** for the best experience. However, you can use other supported models if you want:
+
 | Provider | Notes |
 |----------|-------|
-| OpenAI (GPT-4o, GPT-4, GPT-3.5) | Requires an OpenAI API key |
-| Google Gemini | Requires a Google AI API key |
+| Grok API | **Recommended**. Requires a Grok API key |
 | Ollama (local) | Requires [Ollama](https://ollama.com) running locally; fully offline |
+
 
 ---
 
