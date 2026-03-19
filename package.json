@@ -2,6 +2,7 @@
     "name": "intento-app",
     "version": "1.0.0",
     "description": "Intento - AI-powered cursor assistant for intelligent text responses",
+    "author": "Intento Team",
     "main": "src/main/index.js",
     "scripts": {
         "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
@@ -34,6 +35,7 @@
         "concurrently": "^8.2.2",
         "electron": "^33.0.0",
         "electron-builder": "^24.9.1",
+        "png-to-ico": "^3.0.1",
         "sass": "^1.70.0",
         "vite": "^5.0.12",
         "wait-on": "^7.2.0"
@@ -47,13 +49,14 @@
         "files": [
             "src/main/**/*",
             "src/preload/**/*",
-            "dist/**/*"
+            "src/shared/**/*",
+            "dist/**/*",
+            "ai_config.json"
         ],
         "win": {
             "target": [
                 "nsis"
-            ],
-            "icon": "resources/icon.ico"
+            ]
         },
         "nsis": {
             "oneClick": false,

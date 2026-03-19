@@ -1,4 +1,5 @@
 const OpenAI = require('openai');
+const { app } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { cleanText, isRefusal, isLowQuality } = require('./utils/textCleaner');
@@ -13,7 +14,9 @@ let aiConfig = {
 };
 
 try {
-    const configPath = path.join(__dirname, '../../../ai_config.json');
+    // In dev: resolve relative to source. In prod: resolve from app root.
+    const appRoot = app.getAppPath();
+    const configPath = path.join(appRoot, 'ai_config.json');
     if (fs.existsSync(configPath)) {
         aiConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     }

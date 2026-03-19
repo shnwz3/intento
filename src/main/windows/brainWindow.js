@@ -38,7 +38,7 @@ function createBrainWindow(isDev) {
             }
         });
     } else {
-        brainWindow.loadFile(path.join(__dirname, '../../dist/brain.html'));
+        brainWindow.loadFile(path.join(__dirname, '../../../dist/brain.html'));
     }
 
     brainWindow.on('closed', () => {

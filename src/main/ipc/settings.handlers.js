@@ -26,6 +26,9 @@ function registerSettingsHandlers() {
     });
 
     ipcMain.handle('shell:openExternal', async (event, url) => {
+        if (!url || (!url.startsWith('https://') && !url.startsWith('http://'))) {
+            return { success: false, error: 'Invalid URL: only http/https allowed' };
+        }
         await shell.openExternal(url);
         return { success: true };
     });

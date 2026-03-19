@@ -116,13 +116,12 @@
             </svg></span>
     </div>
     <script>
-        const { ipcRenderer } = require('electron');
         const hudText = document.getElementById('hudText');
         const container = document.querySelector('.hud-container');
 
         const SCOUT_ICON = `<div class="spinner"></div>`;
 
-        ipcRenderer.on('hud:update', (_event, text) => {
+        window.hudAPI.onUpdate((text) => {
             // 1. Lock current dimensions
             const startWidth = container.offsetWidth;
             const startHeight = container.offsetHeight;

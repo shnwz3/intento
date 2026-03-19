@@ -52,8 +52,20 @@ function createMainWindow(isDev) {
     if (isDev) {
         mainWindow.loadURL('http://localhost:5173');
     } else {
-        mainWindow.loadFile(path.join(__dirname, '../../dist/index.html'));
+        mainWindow.loadFile(path.join(__dirname, '../../../dist/index.html'));
     }
+
+    // Enable F12 DevTools in both dev and production for debugging
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+        if (input.type === 'keyDown') {
+            const isToggle = input.key === 'F12' ||
+                ((input.control || input.meta) && input.shift && input.key.toLowerCase() === 'i');
+            if (isToggle) {
+                mainWindow.webContents.toggleDevTools();
+                event.preventDefault();
+            }
+        }
+    });
 
     // Stealth: hide from screenshots
     mainWindow.setContentProtection(true);
@@ -68,6 +80,7 @@ function createMainWindow(isDev) {
 
     mainWindow.on('closed', () => {
         mainWindow = null;
+        require('electron').app.quit();
     });
 }
 

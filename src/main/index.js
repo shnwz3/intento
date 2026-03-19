@@ -2,6 +2,14 @@ const { app, BrowserWindow, globalShortcut, screen } = require('electron');
 const path = require('path');
 require('dotenv').config();
 
+// Global crash handlers — prevent silent app death
+process.on('uncaughtException', (err) => {
+    console.error('💥 Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason) => {
+    console.error('💥 Unhandled Rejection:', reason);
+});
+
 const { registerIpcHandlers } = require('./ipc/vision.handlers');
 const { registerTypingHandlers } = require('./ipc/typing.handlers');
 const { registerBrainHandlers } = require('./ipc/brain.handlers');

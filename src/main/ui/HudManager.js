@@ -23,8 +23,9 @@ class HudManager {
             skipTaskbar: true,
             focusable: false,
             webPreferences: {
-                nodeIntegration: true,
-                contextIsolation: false,
+                preload: path.join(__dirname, '../../preload/hud.js'),
+                contextIsolation: true,
+                nodeIntegration: false,
             },
         });
 
