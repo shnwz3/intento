@@ -1,7 +1,7 @@
-const clipboardy = require('clipboardy');
+const { clipboard } = require('electron');
 
 /**
- * ClipboardManager - Safe clipboard read/write wrapper
+ * ClipboardManager - Safe clipboard read/write wrapper using Electron native API
  * Handles errors silently (clipboard access can fail)
  */
 class ClipboardManager {
@@ -11,7 +11,7 @@ class ClipboardManager {
      */
     read() {
         try {
-            return clipboardy.readSync() || '';
+            return clipboard.readText() || '';
         } catch (e) {
             return '';
         }
@@ -23,7 +23,7 @@ class ClipboardManager {
      */
     write(text) {
         try {
-            clipboardy.writeSync(text);
+            clipboard.writeText(text);
         } catch (e) {
             // Silently fail - clipboard may be locked
         }
@@ -31,3 +31,4 @@ class ClipboardManager {
 }
 
 module.exports = ClipboardManager;
+

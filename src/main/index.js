@@ -1,6 +1,11 @@
 const { app, BrowserWindow, globalShortcut, screen } = require('electron');
 const path = require('path');
-require('dotenv').config();
+const dotenv = require('dotenv');
+const envPath = app.isPackaged 
+    ? path.join(process.resourcesPath, '.env') 
+    : path.resolve(__dirname, '../../.env');
+dotenv.config({ path: envPath });
+
 
 // Global crash handlers — prevent silent app death
 process.on('uncaughtException', (err) => {

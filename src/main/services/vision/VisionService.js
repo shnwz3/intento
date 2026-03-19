@@ -209,8 +209,13 @@ class VisionService {
             }
         }
 
-        return { success: false, error: 'AI timed out or failed. Please try again.' };
+        if (this.providers.length === 1 && this.providers[0].name === 'Ollama') {
+            return { success: false, error: 'No API keys configured. Please add your API keys in the Settings UI.' };
+        }
+
+        return { success: false, error: 'AI timed out or failed. Please check your internet connection or API keys.' };
     }
+
 
     isReady() {
         return this.providers.length > 0;
