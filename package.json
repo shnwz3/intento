@@ -54,13 +54,13 @@
             "**/node_modules/@jitsi/robotjs/**/*"
         ],
         "publish": [
-
             {
                 "provider": "github",
                 "owner": "shnwz3",
-                "repo": "intento"
+                "repo": "intento.ai"
             }
         ],
+
 
         "files": [
             "src/main/**/*",
