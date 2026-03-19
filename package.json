@@ -49,7 +49,11 @@
         "directories": {
             "output": "release"
         },
+        "asarUnpack": [
+            "**/node_modules/@jitsi/robotjs/**/*"
+        ],
         "publish": [
+
             {
                 "provider": "github",
                 "owner": "shnwz3",

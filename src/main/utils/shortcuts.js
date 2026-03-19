@@ -98,7 +98,7 @@ async function triggerFieldFillMode() {
         hudManager.reset();
 
     } catch (err) {
-        hudManager.show(`${WAND_ICON} Sorry, try again`);
+        hudManager.show(`${WAND_ICON} ${err.message}`);
         console.error('❌ Silent execution failed:', err.message);
         await new Promise(r => setTimeout(r, 2000));
         hudManager.reset();
@@ -144,7 +144,7 @@ async function triggerFixGrammarMode() {
         hudManager.reset();
 
     } catch (err) {
-        hudManager.show(`${WAND_ICON} Sorry, try again`);
+        hudManager.show(`${WAND_ICON} ${err.message}`);
         console.error('❌ Fix Grammar mode failed:', err.message);
         await new Promise(r => setTimeout(r, 2000));
         hudManager.reset();
