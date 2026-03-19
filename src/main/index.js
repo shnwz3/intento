@@ -25,6 +25,7 @@ const { createMainWindow, getMainWindow } = require('./windows/mainWindow');
 const hudManager = require('./ui/HudManager');
 const { createBrainWindow } = require('./windows/brainWindow');
 const serviceManager = require('./services/ServiceManager');
+const setupAutoUpdates = require('./utils/updater');
 const BrainService = require('./services/brain/BrainService');
 
 // Disable caching for lightweight app
@@ -56,6 +57,12 @@ app.whenReady().then(async () => {
 
     // Register global shortcuts
     registerShortcuts();
+
+    // Start auto-updates check in production
+    if (!isDev) {
+        setupAutoUpdates();
+    }
+
 
     // Check if brain onboarding is needed
     const brain = new BrainService();

@@ -7,7 +7,9 @@
     "scripts": {
         "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
         "build": "vite build && electron-builder",
+        "release": "vite build && electron-builder --publish always",
         "vite:dev": "vite",
+
         "electron:dev": "electron .",
         "python:install": "cd python && pip install -r requirements.txt",
         "python:dev": "cd python && python main.py"
@@ -22,6 +24,7 @@
         "clipboardy": "2.3.0",
         "dotenv": "^16.4.0",
         "electron-store": "^8.1.0",
+        "electron-updater": "^6.8.3",
         "lucide-react": "^0.344.0",
         "ollama": "^0.5.8",
         "openai": "^6.18.0",
@@ -46,6 +49,14 @@
         "directories": {
             "output": "release"
         },
+        "publish": [
+            {
+                "provider": "github",
+                "owner": "shnwz3",
+                "repo": "intento"
+            }
+        ],
+
         "files": [
             "src/main/**/*",
             "src/preload/**/*",
