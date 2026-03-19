@@ -48,6 +48,24 @@ app.whenReady().then(async () => {
     createMainWindow(isDev);
     hudManager.createHudWindow();
 
+    // Onboarding: Warn if API keys missing (triggered when HUD is ready)
+    const hudWin = hudManager.getHudWindow();
+    if (hudWin) {
+        hudWin.webContents.on('did-finish-load', () => {
+            const configService = require('./services/ConfigService');
+            const config = configService.getConfig();
+            const hasKeys = Object.values(config.keys).some(key => key && key.trim() !== '');
+
+            if (!hasKeys && !isDev) {
+                setTimeout(() => {
+                    hudManager.show(`✨ Please configure API keys in Settings to activate AI features`);
+                    setTimeout(() => hudManager.reset(), 6000);
+                }, 1000); // Small buffer for view mount
+            }
+        });
+    }
+
+
     // Register all IPC handlers
     registerIpcHandlers();
     registerTypingHandlers();
@@ -70,7 +88,10 @@ app.whenReady().then(async () => {
         setTimeout(() => createBrainWindow(isDev), 1000);
     }
 
+
+
     console.log('✅ Intento: Your Intent, Executed');
+
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
