@@ -10,7 +10,8 @@
         "build": "vite build && electron-builder",
         "release": "vite build && electron-builder --publish always",
         "vite:dev": "vite",
-
+        "icon:generate": "powershell -ExecutionPolicy Bypass -File scripts/generate-windows-icon.ps1",
+        "test": "node test/run-tests.cjs",
         "electron:dev": "electron .",
         "python:install": "cd python && pip install -r requirements.txt",
         "python:dev": "cd python && python main.py"
@@ -47,11 +48,19 @@
     "build": {
         "appId": "com.intento.app",
         "productName": "Intento",
+        "icon": "resources/Keyboard-intento.ico",
         "directories": {
-            "output": "release"
+            "output": "release",
+            "buildResources": "resources"
         },
         "asarUnpack": [
             "**/node_modules/@jitsi/robotjs/**/*"
+        ],
+        "extraResources": [
+            {
+                "from": "resources/Keyboard-intento.ico",
+                "to": "Keyboard-intento.ico"
+            }
         ],
         "publish": [
             {
@@ -70,11 +79,16 @@
             "ai_config.json"
         ],
         "win": {
+            "icon": "resources/Keyboard-intento.ico",
             "target": [
                 "nsis"
             ]
         },
         "nsis": {
+            "installerIcon": "resources/Keyboard-intento.ico",
+            "uninstallerIcon": "resources/Keyboard-intento.ico",
+            "installerHeaderIcon": "resources/Keyboard-intento.ico",
+            "displayLanguageSelector": false,
             "oneClick": false,
             "allowToChangeInstallationDirectory": true
         }

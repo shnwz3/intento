@@ -1,5 +1,6 @@
 const { BrowserWindow, screen } = require('electron');
 const path = require('path');
+const { getAppIconPath } = require('../utils/iconPath');
 
 let mainWindow = null;
 let isCapturing = false;
@@ -35,6 +36,7 @@ function createMainWindow(isDev) {
         resizable: false,
         show: true, // Start visible so it shows in taskbar
         skipTaskbar: false,
+        icon: getAppIconPath(),
         webPreferences: {
             preload: path.join(__dirname, '../../preload/index.js'),
             contextIsolation: true,

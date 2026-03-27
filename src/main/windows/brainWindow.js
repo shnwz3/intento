@@ -1,5 +1,6 @@
 const { BrowserWindow } = require('electron');
 const path = require('path');
+const { getAppIconPath } = require('../utils/iconPath');
 
 let brainWindow = null;
 
@@ -12,6 +13,7 @@ function createBrainWindow(isDev) {
         width: 900,
         height: 850,
         backgroundColor: '#0d0d12',
+        icon: getAppIconPath(),
         webPreferences: {
             preload: path.join(__dirname, '../../preload/index.js'),
             contextIsolation: true,

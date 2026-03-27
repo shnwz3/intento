@@ -5,6 +5,7 @@
     width: $capture-size;
     height: $capture-size;
     background: $bg-subtle;
+    border: none;
     border-radius: $radius-md;
     @include flex-center;
     @include no-drag;
@@ -18,56 +19,27 @@
         background: $bg-hover;
         transform: scale(1.05);
     }
+
+    &:disabled {
+        cursor: wait;
+        opacity: 0.65;
+        transform: none;
+    }
 }
 
 .icon {
     color: $text-primary;
 }
 
-.thumbnail {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: none;
-    position: absolute;
-    top: 0;
-    left: 0;
-}
-
 .hasScreenshot {
-    .icon {
-        display: none;
-    }
-
-    .thumbnail {
-        display: block;
-    }
+    background: rgba(125, 211, 163, 0.14);
+    box-shadow: inset 0 0 0 1px rgba(125, 211, 163, 0.28);
 
     &:hover {
-        .thumbnail {
-            opacity: 0.4;
-            filter: blur(1px);
-        }
-
-        .overlay {
-            opacity: 1;
-        }
+        background: rgba(125, 211, 163, 0.2);
     }
 }
 
-.overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    @include flex-center;
-    background: rgba(0, 0, 0, 0.4);
-    opacity: 0;
-    transition: $transition-fast;
-}
-
-.refreshIcon {
-    color: #fff;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+.readyIcon {
+    color: #7dd3a3;
 }

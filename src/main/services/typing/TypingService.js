@@ -1,5 +1,6 @@
 const robot = require('@jitsi/robotjs');
 const ClipboardManager = require('./ClipboardManager');
+const configService = require('../ConfigService');
 
 class TypingCancelledError extends Error {
     constructor() {
@@ -9,12 +10,13 @@ class TypingCancelledError extends Error {
 }
 
 /**
- * TypingService - Handles smart text input at cursor position
- * Supports Unicode, consecutive duplicate chars, and clipboard fallback
+ * TypingService - Handles smart text input, paste, and key presses.
  */
 class TypingService {
-    constructor() {
-        this.clipboard = new ClipboardManager();
+    constructor(options = {}) {
+        this.robot = options.robot || robot;
+        this.clipboard = options.clipboard || new ClipboardManager();
+        this._sleepImpl = options.sleep || ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
         this._isCancelled = false;
     }
 
@@ -22,32 +24,114 @@ class TypingService {
      * Cancel any ongoing typing operation
      */
     cancel() {
-        console.log('🚫 Typing cancellation requested');
+        console.log('Typing cancellation requested');
         this._isCancelled = true;
     }
 
     /**
      * Type text at the current cursor position
-     * @param {string} text - Text to type
-     * @param {number} countdown - Countdown seconds before typing (0 = immediate)
-     * @returns {Promise<{success: boolean, error?: string}>}
+     * @param {string} text
+     * @param {number} countdown
+     * @returns {Promise<{success: boolean, code: string, message: string, data?: {typedLength: number, usedClipboardFallback: boolean}}>}
      */
-    async typeAtCursor(text, countdown = 0) {
-        this._isCancelled = false; // Reset flag at start
-        try {
-            // Copy to clipboard as fallback (user can Ctrl+V if typing fails)
-            this.clipboard.write(text);
+    async typeAtCursor(text, countdown = 0, options = {}) {
+        this._isCancelled = false;
 
-            console.log(`⌨️ Typing ${text.length} chars at cursor...`);
-            await this._typeTextSmart(text);
-            return { success: true };
+        if (!text || !text.trim()) {
+            return {
+                success: false,
+                code: 'EMPTY_TEXT',
+                message: 'There was no text to type.',
+                error: 'There was no text to type.',
+            };
+        }
+
+        const typingConfig = configService.getTypingConfig();
+        const mode = options.mode || typingConfig.mode || 'type';
+
+        try {
+            console.log(`Typing ${text.length} chars at cursor with mode "${mode}"...`);
+            await this._executeMode(mode, text);
+            return {
+                success: true,
+                code: countdown > 0 ? 'TYPE_OK_AFTER_COUNTDOWN' : 'TYPE_OK',
+                message: this._getSuccessMessage(mode),
+                data: {
+                    typedLength: text.length,
+                    usedClipboardFallback: mode === 'paste' || mode === 'clipboard_only' || /[^\x00-\x7F]/.test(text),
+                    mode,
+                },
+            };
         } catch (err) {
             if (err instanceof TypingCancelledError) {
-                console.log('🚫 Typing stopped gracefully.');
-                return { success: false, error: 'Cancelled by user' };
+                console.log('Typing stopped gracefully.');
+                return {
+                    success: false,
+                    code: 'TYPE_CANCELLED',
+                    message: 'Typing was cancelled by the user.',
+                    error: 'Cancelled by user',
+                };
             }
+
             console.error('Typing failed:', err.message);
-            return { success: false, error: err.message };
+            return {
+                success: false,
+                code: 'TYPE_FAILED',
+                message: err.message || 'Typing failed.',
+                error: err.message || 'Typing failed.',
+            };
+        }
+    }
+
+    async fillFieldValue(text, options = {}) {
+        const mode = options.mode || 'paste';
+        return this.typeAtCursor(text, 0, { mode });
+    }
+
+    async selectDropdownValue(text) {
+        this._isCancelled = false;
+
+        if (!text || !text.trim()) {
+            return {
+                success: false,
+                code: 'EMPTY_TEXT',
+                message: 'There was no dropdown value to select.',
+                error: 'There was no dropdown value to select.',
+            };
+        }
+
+        try {
+            this.robot.keyTap('space');
+            await this._sleep(140);
+            await this._typeTextSmart(text);
+            await this._sleep(120);
+            this.robot.keyTap('enter');
+            await this._sleep(120);
+
+            return {
+                success: true,
+                code: 'SELECT_OK',
+                message: 'Dropdown value selected successfully.',
+                data: {
+                    selectedLength: text.length,
+                },
+            };
+        } catch (err) {
+            if (err instanceof TypingCancelledError) {
+                return {
+                    success: false,
+                    code: 'TYPE_CANCELLED',
+                    message: 'Dropdown selection was cancelled by the user.',
+                    error: 'Cancelled by user',
+                };
+            }
+
+            return {
+                success: false,
+                code: 'TYPE_FAILED',
+                message: err.message || 'Dropdown selection failed.',
+                error: err.message || 'Dropdown selection failed.',
+            };
         }
     }
 
@@ -60,42 +144,47 @@ class TypingService {
         const original = this.clipboard.read();
 
         try {
-            // Clear clipboard to detect new copy
             this.clipboard.write('');
             await this._sleep(50);
 
-            console.log('⌨️ Sending Ctrl+C...');
-            robot.keyTap('c', 'control');
+            console.log('Sending Ctrl+C...');
+            this.robot.keyTap('c', 'control');
             await this._sleep(400);
 
             selectedText = this.clipboard.read();
-
-            // Restore original clipboard
-            if (original) {
-                this.clipboard.write(original);
-            }
         } catch (err) {
-            console.log('❌ Failed to get selected text:', err.message);
+            console.log('Failed to get selected text:', err.message);
+        } finally {
+            this.clipboard.write(original);
         }
 
         if (selectedText) {
-            console.log(`✅ Captured: "${selectedText.substring(0, 30)}${selectedText.length > 30 ? '...' : ''}"`);
+            console.log(`Captured selection (${selectedText.length} chars)`);
         }
         return selectedText;
     }
 
-    /**
-     * Smart typing that handles Unicode and duplicate chars
-     * @param {string} text
-     * @private
-     */
-    async _typeTextSmart(text) {
-        if (!text) return;
+    async pressKey(key, modifier) {
+        this._throwIfCancelled();
+        if (typeof modifier === 'undefined') {
+            this.robot.keyTap(key);
+        } else {
+            this.robot.keyTap(key, modifier);
+        }
+        await this._sleep(80);
+    }
 
+    async scrollVertical(amount = -720) {
+        this._throwIfCancelled();
+        this.robot.scrollMouse(0, amount);
+        await this._sleep(120);
+    }
+
+    async _typeTextSmart(text) {
         const chunks = text.match(/[\x00-\x7F]+|[^\x00-\x7F]+/g) || [];
 
         for (const chunk of chunks) {
-            if (this._isCancelled) throw new TypingCancelledError();
+            this._throwIfCancelled();
 
             if (this._containsUnicode(chunk)) {
                 await this._pasteUnicode(chunk);
@@ -105,61 +194,86 @@ class TypingService {
         }
     }
 
-    /**
-     * Type ASCII text char by char (handles consecutive duplicates)
-     * @param {string} text
-     * @private
-     */
     async _typeASCII(text) {
         let prevChar = '';
         for (const char of text) {
-            if (this._isCancelled) throw new TypingCancelledError();
+            this._throwIfCancelled();
 
             if (char === prevChar) {
                 await this._sleep(60);
-                robot.keyTap(char.toLowerCase());
+                this.robot.keyTap(char.toLowerCase());
             } else {
-                robot.typeString(char);
+                this.robot.typeString(char);
             }
             await this._sleep(10);
             prevChar = char;
         }
     }
 
-    /**
-     * Paste Unicode text via clipboard (robotjs can't type Unicode)
-     * @param {string} text
-     * @private
-     */
     async _pasteUnicode(text) {
-        if (this._isCancelled) throw new TypingCancelledError();
+        this._throwIfCancelled();
 
         const previous = this.clipboard.read();
         try {
             this.clipboard.write(text);
-            robot.keyTap('v', 'control');
+            this.robot.keyTap('v', 'control');
             await this._sleep(100);
         } finally {
             this.clipboard.write(previous);
         }
     }
 
-    /**
-     * @param {string} str
-     * @returns {boolean}
-     * @private
-     */
+    async _executeMode(mode, text) {
+        if (mode === 'clipboard_only') {
+            this.clipboard.write(text);
+            return;
+        }
+
+        if (mode === 'paste') {
+            await this._pasteText(text);
+            return;
+        }
+
+        await this._typeTextSmart(text);
+    }
+
+    async _pasteText(text) {
+        this._throwIfCancelled();
+
+        const previous = this.clipboard.read();
+        try {
+            this.clipboard.write(text);
+            this.robot.keyTap('v', 'control');
+            await this._sleep(120);
+        } finally {
+            this.clipboard.write(previous);
+        }
+    }
+
+    _getSuccessMessage(mode) {
+        if (mode === 'clipboard_only') {
+            return 'Text copied to clipboard. Paste it where you need it.';
+        }
+
+        if (mode === 'paste') {
+            return 'Text pasted successfully.';
+        }
+
+        return 'Text typed successfully.';
+    }
+
     _containsUnicode(str) {
         return /[^\x00-\x7F]/.test(str);
     }
 
-    /**
-     * @param {number} ms
-     * @returns {Promise<void>}
-     * @private
-     */
+    _throwIfCancelled() {
+        if (this._isCancelled) {
+            throw new TypingCancelledError();
+        }
+    }
+
     _sleep(ms) {
-        return new Promise((resolve) => setTimeout(resolve, ms));
+        return this._sleepImpl(ms);
     }
 }
 

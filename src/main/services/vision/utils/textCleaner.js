@@ -30,10 +30,19 @@ function cleanText(text) {
     ];
 
     let lower = clean.toLowerCase();
-    for (const filler of fillers) {
-        if (lower.startsWith(filler)) {
-            clean = clean.substring(filler.length).replace(/^[:\s\n\-]*/, '');
-            lower = clean.toLowerCase();
+    let changed = true;
+    while (changed) {
+        changed = false;
+
+        clean = clean.replace(/^["'\s]+|["'\s]+$/g, '').trim();
+        lower = clean.toLowerCase();
+
+        for (const filler of fillers) {
+            if (lower.startsWith(filler)) {
+                clean = clean.substring(filler.length).replace(/^[:\s\n\-"'`]+/, '').trim();
+                lower = clean.toLowerCase();
+                changed = true;
+            }
         }
     }
 

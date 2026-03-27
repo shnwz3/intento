@@ -61,8 +61,10 @@ export default function BrainOnboarding() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [aiConfig, setAiConfig] = useState(null);
     const [apiCredits, setApiCredits] = useState({ balance: '', status: 'loading' });
+    const [providerOverview, setProviderOverview] = useState([]);
     const [isAddingHeading, setIsAddingHeading] = useState(false);
     const [newHeadingLabel, setNewHeadingLabel] = useState('');
+    const [persistenceIssue, setPersistenceIssue] = useState('');
 
     // Dnd Sensors
     const sensors = useSensors(
@@ -92,6 +94,7 @@ export default function BrainOnboarding() {
                 setTags(data.tags || []);
                 setHeadings(data.headings || []);
                 setActiveAgentId(data.activeAgentId || 'no_agent');
+                setPersistenceIssue(data.persistenceIssue || '');
 
                 // Auto-open Voice & Style only if this brain's persona traits have values
                 let hasTraits = false;
@@ -113,8 +116,12 @@ export default function BrainOnboarding() {
 
     const loadAIConfig = useCallback(async () => {
         try {
-            const config = await window.intentoAPI.getAIConfig();
+            const [config, overview] = await Promise.all([
+                window.intentoAPI.getAIConfig(),
+                window.intentoAPI.getProviderOverview(),
+            ]);
             setAiConfig(config);
+            setProviderOverview(overview || []);
             if (config.activeProvider) {
                 const credits = await window.intentoAPI.getAICredits(config.activeProvider);
                 setApiCredits(credits);
@@ -129,11 +136,15 @@ export default function BrainOnboarding() {
         loadAIConfig();
 
         // Sync state when backend broadcasts updates
-        window.intentoAPI.onBrainUpdate((status) => {
+        const cleanupBrainUpdate = window.intentoAPI.onBrainUpdate((status) => {
             if (status.activeAgentId) {
                 setActiveAgentId(status.activeAgentId);
             }
         });
+
+        return () => {
+            cleanupBrainUpdate?.();
+        };
     }, [loadBrainData, loadAIConfig]);
 
 
@@ -217,6 +228,7 @@ export default function BrainOnboarding() {
         const result = await window.intentoAPI.brainAddTag(headingId, label, value);
         if (result.success) {
              setTags(prev => [...prev, result.tag]);
+             setStatus('Saved instantly');
         }
     };
 
@@ -224,6 +236,7 @@ export default function BrainOnboarding() {
         const result = await window.intentoAPI.brainUpdateTag(id, updates);
         if (result.success) {
             setTags(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+            setStatus('Saved instantly');
         }
     };
 
@@ -231,6 +244,7 @@ export default function BrainOnboarding() {
         const result = await window.intentoAPI.brainDeleteTag(id);
         if (result.success) {
             setTags(prev => prev.filter(t => t.id !== id));
+            setStatus('Saved instantly');
         }
     };
 
@@ -425,6 +439,8 @@ export default function BrainOnboarding() {
                                 <div className={styles.integrityBadge}>System Active</div>
                                 <span className={styles.nexusStatus}>{status}</span>
                              </div>}
+                             <p className={styles.saveModeNote}>Changes save instantly to this device.</p>
+                             {persistenceIssue ? <p className={styles.persistenceWarning}>{persistenceIssue}</p> : null}
                          </div>
 
                          <div className={styles.controlsRight}>
@@ -456,12 +472,16 @@ export default function BrainOnboarding() {
                         <AIEngineConfig 
                             aiConfig={aiConfig}
                             apiCredits={apiCredits}
+                            providerOverview={providerOverview}
                             onSave={async (fullConfig) => {
-                                setAiConfig(fullConfig);
-                                await window.intentoAPI.saveAIConfig(fullConfig);
+                                const saveResult = await window.intentoAPI.saveAIConfig(fullConfig);
+                                const nextConfig = saveResult?.config || fullConfig;
+                                setAiConfig(nextConfig);
+                                const overview = await window.intentoAPI.getProviderOverview();
+                                setProviderOverview(overview || []);
                                 // Reload credits for the new active provider
                                 try {
-                                    const credits = await window.intentoAPI.getAICredits(fullConfig.activeProvider);
+                                    const credits = await window.intentoAPI.getAICredits(nextConfig.activeProvider);
                                     setApiCredits(credits);
                                 } catch (e) {
                                     console.error('Failed to load credits:', e);

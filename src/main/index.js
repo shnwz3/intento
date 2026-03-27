@@ -1,8 +1,8 @@
 const { app, BrowserWindow, globalShortcut, screen } = require('electron');
 const path = require('path');
 const dotenv = require('dotenv');
-const envPath = app.isPackaged 
-    ? path.join(process.resourcesPath, '.env') 
+const envPath = app.isPackaged
+    ? path.join(process.resourcesPath, '.env')
     : path.resolve(__dirname, '../../.env');
 dotenv.config({ path: envPath });
 
@@ -20,6 +20,7 @@ const { registerTypingHandlers } = require('./ipc/typing.handlers');
 const { registerBrainHandlers } = require('./ipc/brain.handlers');
 const { registerWindowHandlers } = require('./ipc/window.handlers');
 const { registerSettingsHandlers } = require('./ipc/settings.handlers');
+const { registerFormHandlers } = require('./ipc/form.handlers');
 const { registerShortcuts, unregisterShortcuts } = require('./utils/shortcuts');
 const { createMainWindow, getMainWindow } = require('./windows/mainWindow');
 const hudManager = require('./ui/HudManager');
@@ -72,6 +73,7 @@ app.whenReady().then(async () => {
     registerBrainHandlers(isDev);
     registerWindowHandlers();
     registerSettingsHandlers();
+    registerFormHandlers();
 
     // Register global shortcuts
     registerShortcuts();
@@ -90,7 +92,7 @@ app.whenReady().then(async () => {
 
 
 
-    console.log('✅ Intento: Your Intent, Executed');
+    console.log('✅ Intento: Your Intent to Execute');
 
 
     app.on('activate', () => {

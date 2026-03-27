@@ -24,28 +24,41 @@ class ServiceManager {
      * Order matters if we do manual dependency injection here.
      */
     initialize() {
-        console.log('🔧 Initializing ServiceManager...');
+        console.log('Initializing ServiceManager...');
 
         // 1. Core Services (No dependencies or low-level)
         const ScreenshotService = require('./screenshot/ScreenshotService');
         const BrainService = require('./brain/BrainService');
         const VisionService = require('./vision/VisionService');
-        const PromptService = require('../prompts/PromptService'); // It's already an instance, but let's register it for consistency
+        const TypingService = require('./typing/TypingService');
+        const PromptService = require('../prompts/PromptService');
 
         this.register('ScreenshotService', new ScreenshotService());
         this.register('BrainService', new BrainService());
         this.register('VisionService', new VisionService());
+        this.register('TypingService', new TypingService());
         this.register('PromptService', PromptService);
 
         // 2. Dependent Services (Need Vision, Brain, etc.)
         const SmartWriterService = require('./SmartWriterService');
+        const FormFillerService = require('./formfill/FormFillerService');
+        const FormAutomationService = require('./formfill/FormAutomationService');
 
+        const screenshot = this.get('ScreenshotService');
         const vision = this.get('VisionService');
         const brain = this.get('BrainService');
+        const typing = this.get('TypingService');
+        const formFiller = new FormFillerService(vision, brain);
 
         this.register('SmartWriterService', new SmartWriterService(vision, brain));
+        this.register('FormFillerService', formFiller);
+        this.register('FormAutomationService', new FormAutomationService(
+            screenshot,
+            formFiller,
+            typing
+        ));
 
-        console.log('✅ All services initialized.');
+        console.log('All services initialized.');
     }
 }
 

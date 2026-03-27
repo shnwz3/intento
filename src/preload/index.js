@@ -15,6 +15,11 @@ contextBridge.exposeInMainWorld('intentoAPI', {
     typeAtCursor: (text, countdown) =>
         ipcRenderer.invoke('text:typeAtCursor', { text, countdown }),
 
+    // Form Automation
+    inspectForm: (base64) => ipcRenderer.invoke('form:inspect', { base64 }),
+    automateForm: () => ipcRenderer.invoke('form:automate'),
+    cancelFormAutomation: () => ipcRenderer.invoke('form:cancel'),
+
     // Brain — Tag System
     openBrain: () => ipcRenderer.invoke('brain:open'),
     brainUploadDoc: () => ipcRenderer.invoke('brain:uploadDoc'),
@@ -56,13 +61,24 @@ contextBridge.exposeInMainWorld('intentoAPI', {
 
     // Events from main
     onShortcut: (callback) => {
-        ipcRenderer.on('shortcut:image-mode', () => callback());
+        const listener = () => callback();
+        ipcRenderer.on('shortcut:image-mode', listener);
+        return () => ipcRenderer.removeListener('shortcut:image-mode', listener);
     },
     onHudUpdate: (callback) => {
-        ipcRenderer.on('hud:update', (_event, text) => callback(text));
+        const listener = (_event, text) => callback(text);
+        ipcRenderer.on('hud:update', listener);
+        return () => ipcRenderer.removeListener('hud:update', listener);
     },
     onBrainUpdate: (callback) => {
-        ipcRenderer.on('brain:update', (_event, status) => callback(status));
+        const listener = (_event, status) => callback(status);
+        ipcRenderer.on('brain:update', listener);
+        return () => ipcRenderer.removeListener('brain:update', listener);
+    },
+    onConfigUpdate: (callback) => {
+        const listener = (_event, config) => callback(config);
+        ipcRenderer.on('config:update', listener);
+        return () => ipcRenderer.removeListener('config:update', listener);
     },
 
     // HUD Control
@@ -73,6 +89,7 @@ contextBridge.exposeInMainWorld('intentoAPI', {
     // Settings & Models
     getAIConfig: () => ipcRenderer.invoke('getAIConfig'),
     saveAIConfig: (config) => ipcRenderer.invoke('saveAIConfig', config),
+    getProviderOverview: () => ipcRenderer.invoke('getProviderOverview'),
     getAICredits: (provider) => ipcRenderer.invoke('getAICredits', provider),
     openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
 });

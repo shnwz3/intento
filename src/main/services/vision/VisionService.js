@@ -7,26 +7,21 @@ const { cleanText, isRefusal, isLowQuality } = require('./utils/textCleaner');
 const promptService = require('../../prompts/PromptService');
 const configService = require('../ConfigService');
 
-// Load AI Configuration (system prompt & model params)
 let aiConfig = {
     system_prompt: promptService.SYSTEM_PROMPT,
     model_params: { max_tokens: 500, temperature: 0.75 },
 };
 
 try {
-    // In dev: resolve relative to source. In prod: resolve from app root.
     const appRoot = app.getAppPath();
     const configPath = path.join(appRoot, 'ai_config.json');
     if (fs.existsSync(configPath)) {
         aiConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     }
 } catch (err) {
-    console.warn('⚠️ Failed to load ai_config.json, using defaults.');
+    console.warn('Failed to load ai_config.json, using defaults.');
 }
 
-/**
- * Provider base URLs and models for each supported API
- */
 const PROVIDER_CONFIG = {
     grok: {
         name: 'Grok',
@@ -68,91 +63,64 @@ const PROVIDER_CONFIG = {
     },
 };
 
-/**
- * VisionService - Orchestrates AI vision providers
- * Reads API keys from ConfigService (user-configured via Settings UI)
- * Fallback: Ollama (local dev)
- */
 class VisionService {
     constructor() {
         this.providers = this._buildProviders();
         this.currentIndex = 0;
-        console.log(`✅ VisionService initialized with ${this.providers.length} provider(s)`);
+        console.log(`VisionService initialized with ${this.providers.length} provider(s)`);
     }
 
-    /**
-     * Refresh providers when user changes API config from Settings UI
-     */
     refreshProviders() {
         this.providers = this._buildProviders();
         this.currentIndex = 0;
-        console.log(`🔄 VisionService refreshed with ${this.providers.length} provider(s)`);
+        console.log(`VisionService refreshed with ${this.providers.length} provider(s)`);
     }
 
-    /**
-     * Build the list of available providers from ConfigService (electron-store)
-     * Falls back to process.env for backward compatibility
-     * @returns {Array<{name: string, call: Function}>}
-     */
     _buildProviders() {
         const providers = [];
         const config = configService.getConfig();
         const activeProvider = config.activeProvider;
         const activeKey = config.keys[activeProvider];
+        const fallbackProviderIds = Object.entries(config.keys)
+            .filter(([providerId, key]) => providerId !== activeProvider && key && PROVIDER_CONFIG[providerId])
+            .map(([providerId]) => providerId);
 
-        // 1. Try user-configured provider from Settings UI (priority)
         if (activeKey && PROVIDER_CONFIG[activeProvider]) {
             const providerCfg = PROVIDER_CONFIG[activeProvider];
-            if (providerCfg.type === 'google-native') {
-                providers.push({
-                    name: providerCfg.name,
-                    call: (img, prompt) => this._callGemini(activeKey, img, prompt),
-                });
-            } else {
-                providers.push({
-                    name: providerCfg.name,
-                    call: (img, prompt) => this._callOpenAICompatible(activeKey, providerCfg, img, prompt),
-                });
-            }
-            console.log(`🔑 Using ${providerCfg.name} from Settings UI`);
+            providers.push(this._createProviderEntry(providerCfg, activeKey));
+            console.log(`Using ${providerCfg.name} from Settings UI`);
         }
 
-        // 2. If no UI key set, also try other saved keys as fallbacks
-        if (!activeKey) {
-            for (const [providerId, key] of Object.entries(config.keys)) {
-                if (!key || providerId === activeProvider) continue;
-                const providerCfg = PROVIDER_CONFIG[providerId];
-                if (!providerCfg) continue;
-
-                if (providerCfg.type === 'google-native') {
-                    providers.push({
-                        name: providerCfg.name,
-                        call: (img, prompt) => this._callGemini(key, img, prompt),
-                    });
-                } else {
-                    providers.push({
-                        name: providerCfg.name,
-                        call: (img, prompt) => this._callOpenAICompatible(key, providerCfg, img, prompt),
-                    });
-                }
-            }
+        for (const providerId of fallbackProviderIds) {
+            providers.push(this._createProviderEntry(PROVIDER_CONFIG[providerId], config.keys[providerId]));
         }
 
-        // 3. Ollama fallback (always available for dev)
-        providers.push({ name: 'Ollama', call: (img, prompt) => this._callOllama(img, prompt) });
+        providers.push({
+            name: 'Ollama',
+            type: 'local',
+            call: (img, prompt) => this._callOllama(img, prompt),
+        });
 
         return providers;
     }
 
-    /**
-     * Main entry point - analyze a screenshot with optional context
-     * @param {string} imageBase64 - Base64 encoded screenshot
-     * @param {string} selectedText - Any selected/highlighted text
-     * @param {string} prompt - The user prompt or auto-generated directive
-     * @param {string} brainContext - Brain persona context
-     * @returns {Promise<{success: boolean, response?: string, error?: string}>}
-     */
-    async analyze(imageBase64, selectedText = '', prompt = '', brainContext = '') {
+    _createProviderEntry(providerCfg, key) {
+        if (providerCfg.type === 'google-native') {
+            return {
+                name: providerCfg.name,
+                type: providerCfg.type,
+                call: (img, prompt) => this._callGemini(key, img, prompt),
+            };
+        }
+
+        return {
+            name: providerCfg.name,
+            type: providerCfg.type,
+            call: (img, prompt) => this._callOpenAICompatible(key, providerCfg, img, prompt),
+        };
+    }
+
+    _buildVisionPrompt(selectedText, prompt, brainContext) {
         let userPrompt = prompt || promptService.DEFAULT_VISION_PROMPT;
 
         if (selectedText) {
@@ -162,78 +130,158 @@ class VisionService {
             userPrompt = promptService.wrapWithBrainContext(brainContext, userPrompt);
         }
 
-        // Ensure base64 string (not Buffer)
-        const base64 = Buffer.isBuffer(imageBase64)
-            ? imageBase64.toString('base64')
-            : imageBase64;
+        return userPrompt;
+    }
 
-        // Try each provider with rotation
+    async analyze(imageBase64, selectedText = '', prompt = '', brainContext = '') {
+        const userPrompt = this._buildVisionPrompt(selectedText, prompt, brainContext);
+        const base64 = this._normalizeImageBase64(imageBase64);
+
+        const configuredProviders = this.providers.filter((provider) => provider.name !== 'Ollama');
+        const failures = [];
+
         for (let i = 0; i < this.providers.length; i++) {
             const idx = (this.currentIndex + i) % this.providers.length;
             const provider = this.providers[idx];
 
-            try {
-                console.log(`🤖 Trying ${provider.name}...`);
-
-                // Implement 15s timeout per provider
-                const responsePromise = provider.call(base64, userPrompt);
-                const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('TIMEOUT')), 15000)
-                );
-
-                const raw = await Promise.race([responsePromise, timeoutPromise]);
-                const cleaned = cleanText(raw);
-
-                if (isRefusal(cleaned)) {
-                    console.log(`⚠️ ${provider.name} refused, trying next...`);
-                    continue;
-                }
-                if (isLowQuality(cleaned)) {
-                    console.log(`⚠️ ${provider.name} returned an empty response. Trying next...`);
-                    continue;
-                }
-
-                console.log(`✅ High-quality response from ${provider.name}`);
+            const result = await this._tryProvider(provider, base64, userPrompt);
+            if (result.success) {
                 this.currentIndex = idx;
-                return { success: true, response: cleaned };
-            } catch (err) {
-                if (err.message === 'TIMEOUT') {
-                    console.warn(`⏳ ${provider.name} timed out after 15s`);
-                } else {
-                    console.warn(`⚠️ ${provider.name} failed:`, err.message);
-                }
-
-                if ([401, 402, 429].includes(err.status) || err.message.includes('quota') || err.message === 'TIMEOUT') {
-                    continue;
-                }
+                return result;
             }
+
+            failures.push(result);
         }
 
-        if (this.providers.length === 1 && this.providers[0].name === 'Ollama') {
-            return { success: false, error: 'No API keys configured. Please add your API keys in the Settings UI.' };
+        if (configuredProviders.length === 0) {
+            return {
+                success: false,
+                code: 'NO_PROVIDER',
+                message: 'No AI provider is configured. Add an API key in Settings or start Ollama locally.',
+                error: 'No AI provider is configured. Add an API key in Settings or start Ollama locally.',
+                failures,
+            };
         }
 
-        return { success: false, error: 'AI timed out or failed. Please check your internet connection or API keys.' };
+        const terminalFailure = failures[failures.length - 1];
+        return {
+            success: false,
+            code: terminalFailure?.code || 'ANALYZE_FAILED',
+            message: terminalFailure?.message || 'AI analysis failed.',
+            error: terminalFailure?.message || 'AI analysis failed.',
+            failures,
+        };
     }
 
+    _normalizeImageBase64(imageBase64) {
+        if (Buffer.isBuffer(imageBase64)) {
+            return imageBase64.toString('base64');
+        }
+
+        if (typeof imageBase64 !== 'string') {
+            return imageBase64;
+        }
+
+        return imageBase64.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, '');
+    }
+
+    async _tryProvider(provider, base64, userPrompt) {
+        try {
+            console.log(`Trying ${provider.name}...`);
+
+            const responsePromise = provider.call(base64, userPrompt);
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('TIMEOUT')), 15000)
+            );
+
+            const raw = await Promise.race([responsePromise, timeoutPromise]);
+            const cleaned = cleanText(raw);
+
+            if (!cleaned) {
+                return {
+                    success: false,
+                    provider: provider.name,
+                    code: 'EMPTY_RESPONSE',
+                    message: `${provider.name} returned an empty response.`,
+                    error: `${provider.name} returned an empty response.`,
+                };
+            }
+
+            if (isRefusal(cleaned)) {
+                return {
+                    success: false,
+                    provider: provider.name,
+                    code: 'PROVIDER_REFUSAL',
+                    message: `${provider.name} refused the request.`,
+                    error: `${provider.name} refused the request.`,
+                };
+            }
+
+            if (isLowQuality(cleaned)) {
+                return {
+                    success: false,
+                    provider: provider.name,
+                    code: 'LOW_QUALITY_RESPONSE',
+                    message: `${provider.name} returned a weak response.`,
+                    error: `${provider.name} returned a weak response.`,
+                };
+            }
+
+            console.log(`High-quality response from ${provider.name}`);
+            return {
+                success: true,
+                code: 'ANALYZE_OK',
+                message: 'AI analysis completed successfully.',
+                response: cleaned,
+                provider: provider.name,
+            };
+        } catch (err) {
+            if (err.message === 'TIMEOUT') {
+                return {
+                    success: false,
+                    provider: provider.name,
+                    code: 'PROVIDER_TIMEOUT',
+                    message: `${provider.name} timed out after 15 seconds.`,
+                    error: `${provider.name} timed out after 15 seconds.`,
+                };
+            }
+
+            if ([401, 402, 429].includes(err.status) || err.message.includes('quota')) {
+                return {
+                    success: false,
+                    provider: provider.name,
+                    code: 'PROVIDER_AUTH_OR_QUOTA',
+                    message: `${provider.name} rejected the request due to auth or quota limits.`,
+                    error: `${provider.name} rejected the request due to auth or quota limits.`,
+                };
+            }
+
+            return {
+                success: false,
+                provider: provider.name,
+                code: 'PROVIDER_ERROR',
+                message: err.message || `${provider.name} failed.`,
+                error: err.message || `${provider.name} failed.`,
+            };
+        }
+    }
 
     isReady() {
         return this.providers.length > 0;
     }
 
-    /**
-     * Text-only AI call (no image) — used for document tag extraction
-     * Reads from ConfigService (user-configured keys)
-     * @param {string} prompt
-     * @returns {Promise<{success: boolean, response?: string, error?: string}>}
-     */
     async analyzeTextOnly(prompt) {
         const config = configService.getConfig();
         const activeProvider = config.activeProvider;
         const apiKey = config.keys[activeProvider] || process.env.GROK_API_KEY || process.env.OPENROUTER_API_KEY;
 
         if (!apiKey) {
-            return { success: false, error: 'No API key configured. Go to AI Engine settings to add your key.' };
+            return {
+                success: false,
+                code: 'NO_PROVIDER',
+                message: 'No API key configured. Go to AI Engine settings to add your key.',
+                error: 'No API key configured. Go to AI Engine settings to add your key.',
+            };
         }
 
         try {
@@ -241,7 +289,6 @@ class VisionService {
             let baseURL = providerCfg.baseURL;
             let model = providerCfg.textModel;
 
-            // Fallback detection for env var keys
             if (!config.keys[activeProvider] && apiKey.startsWith('sk-or-')) {
                 baseURL = 'https://openrouter.ai/api/v1';
                 model = 'google/gemini-2.0-flash-exp:free';
@@ -258,18 +305,24 @@ class VisionService {
                 temperature: 0.3,
             });
 
-            return { success: true, response: response.choices[0].message.content };
+            return {
+                success: true,
+                code: 'TEXT_ANALYZE_OK',
+                message: 'Text-only analysis completed successfully.',
+                response: response.choices[0].message.content,
+                provider: providerCfg.name,
+            };
         } catch (err) {
             console.error('Text-only AI failed:', err.message);
-            return { success: false, error: err.message };
+            return {
+                success: false,
+                code: 'TEXT_ANALYZE_FAILED',
+                message: err.message || 'Text-only AI failed.',
+                error: err.message || 'Text-only AI failed.',
+            };
         }
     }
 
-    // ============ PROVIDER IMPLEMENTATIONS ============
-
-    /**
-     * Generic OpenAI-compatible API call (works for Grok, OpenAI, OpenRouter, Anthropic)
-     */
     async _callOpenAICompatible(apiKey, providerCfg, base64Image, userPrompt) {
         const clientOpts = {
             apiKey,
@@ -303,9 +356,6 @@ class VisionService {
         return response.choices[0].message.content;
     }
 
-    /**
-     * Gemini API call (native Google SDK)
-     */
     async _callGemini(apiKey, base64Image, userPrompt) {
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
@@ -319,9 +369,6 @@ class VisionService {
         return (await result.response).text();
     }
 
-    /**
-     * Local Ollama fallback
-     */
     async _callOllama(base64Image, userPrompt) {
         const ollama = require('ollama').default;
         const response = await ollama.generate({

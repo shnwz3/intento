@@ -595,6 +595,18 @@
     }
 }
 
+.saveModeNote {
+    font-size: 12px;
+    color: #71717a;
+    margin: 0;
+}
+
+.persistenceWarning {
+    font-size: 12px;
+    color: #fca5a5;
+    margin: 4px 0 0;
+}
+
 .tabNav {
     display: flex;
     gap: 8px;
@@ -1411,6 +1423,44 @@
     }
 }
 
+.settingsSummary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+
+    @media (max-width: 768px) {
+        grid-template-columns: 1fr;
+    }
+}
+
+.summaryCard {
+    background: rgba(0, 0, 0, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    strong {
+        color: #fff;
+        font-size: 15px;
+    }
+
+    small {
+        color: #71717a;
+        font-size: 11px;
+    }
+}
+
+.summaryLabel {
+    color: #52525b;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
 .configSaveBtn {
     margin-top: 8px;
     width: 100%;
@@ -1497,6 +1547,47 @@
         background: rgba(255, 255, 255, 0.05);
         color: #a1a1aa;
     }
+}
+
+.providerStatusPill {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    margin-top: 8px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.active {
+    background: rgba(16, 185, 129, 0.15);
+    color: #6ee7b7;
+}
+
+.configured {
+    background: rgba(99, 102, 241, 0.16);
+    color: #a5b4fc;
+}
+
+.missing {
+    background: rgba(63, 63, 70, 0.4);
+    color: #a1a1aa;
+}
+
+.connected {
+    background: #10b981;
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+}
+
+.loading {
+    background: #f59e0b;
+}
+
+.error {
+    background: #ef4444;
 }
 
 .providerActive {
@@ -1661,21 +1752,123 @@
         right: 12px;
     }
 
-    .connected {
-        background: #10b981;
-        box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
-    }
-
-    .loading {
-        background: #f59e0b;
-    }
-
-    .error {
-        background: #ef4444;
-    }
-
     .missing {
         background: #52525b;
+    }
+}
+
+.outputConfig {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+}
+
+.outputHeader {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+
+    svg {
+        color: #6366f1;
+        margin-top: 2px;
+    }
+
+    h4 {
+        margin: 0 0 4px;
+        color: #fff;
+        font-size: 14px;
+    }
+
+    p {
+        margin: 0;
+        font-size: 12px;
+        color: #71717a;
+    }
+}
+
+.outputModeGrid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+
+    @media (max-width: 768px) {
+        grid-template-columns: 1fr;
+    }
+}
+
+.outputModeCard {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    color: #a1a1aa;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    svg {
+        color: #6366f1;
+    }
+
+    strong {
+        color: #fff;
+        font-size: 13px;
+    }
+
+    span {
+        font-size: 11px;
+        line-height: 1.5;
+        text-align: left;
+    }
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.05);
+        transform: translateY(-1px);
+    }
+}
+
+.outputModeActive {
+    border-color: rgba(99, 102, 241, 0.55);
+    box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.35);
+    background: rgba(99, 102, 241, 0.1);
+}
+
+.countdownGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    label {
+        font-size: 11px;
+        font-weight: 800;
+        color: #a1a1aa;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+
+    input {
+        width: 100%;
+        max-width: 120px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 12px 14px;
+        color: #fff;
+        font-size: 14px;
+        outline: none;
+    }
+
+    small {
+        color: #71717a;
+        font-size: 11px;
+        line-height: 1.4;
     }
 }
 

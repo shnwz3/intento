@@ -1,4 +1,4 @@
-const { ipcMain, shell } = require('electron');
+const { BrowserWindow, ipcMain, shell } = require('electron');
 const configService = require('../services/ConfigService');
 
 function registerSettingsHandlers() {
@@ -6,26 +6,33 @@ function registerSettingsHandlers() {
         return configService.getConfig();
     });
 
-    ipcMain.handle('saveAIConfig', async (event, config) => {
+    ipcMain.handle('saveAIConfig', async (_event, config) => {
         const result = configService.saveConfig(config);
 
-        // Refresh VisionService providers so the new key takes effect immediately
         try {
             const serviceManager = require('../services/ServiceManager');
             const vision = serviceManager.get('VisionService');
             vision.refreshProviders();
         } catch (e) {
-            console.warn('⚠️ Could not refresh VisionService:', e.message);
+            console.warn('Could not refresh VisionService:', e.message);
         }
+
+        BrowserWindow.getAllWindows().forEach((win) => {
+            win.webContents.send('config:update', result.config);
+        });
 
         return result;
     });
 
-    ipcMain.handle('getAICredits', async (event, provider) => {
+    ipcMain.handle('getProviderOverview', async () => {
+        return configService.getProviderOverview();
+    });
+
+    ipcMain.handle('getAICredits', async (_event, provider) => {
         return configService.getCredits(provider);
     });
 
-    ipcMain.handle('shell:openExternal', async (event, url) => {
+    ipcMain.handle('shell:openExternal', async (_event, url) => {
         if (!url || (!url.startsWith('https://') && !url.startsWith('http://'))) {
             return { success: false, error: 'Invalid URL: only http/https allowed' };
         }
@@ -35,4 +42,3 @@ function registerSettingsHandlers() {
 }
 
 module.exports = { registerSettingsHandlers };
-

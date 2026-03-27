@@ -21,21 +21,24 @@ function registerIpcHandlers() {
     // Capture screenshot
     ipcMain.handle('screenshot:capture', async () => {
         const { setCapturing } = require('../windows/mainWindow');
-        try {
-            setCapturing(true);
-            const result = await screenshot.capture();
-            setCapturing(false);
-            return {
-                success: true,
-                base64: `data:image/png;base64,${result.base64}`,
-                width: result.width,
-                height: result.height,
-            };
-        } catch (err) {
-            setCapturing(false);
-            console.error('Screenshot capture failed:', err.message);
-            return { success: false, error: err.message };
+        setCapturing(true);
+        const result = await screenshot.capture();
+        setCapturing(false);
+
+        if (!result.success) {
+            console.error('Screenshot capture failed:', result.message);
+            return result;
         }
+
+        return {
+            success: true,
+            code: result.code,
+            message: result.message,
+            base64: `data:image/png;base64,${result.data.base64}`,
+            width: result.data.width,
+            height: result.data.height,
+            timestamp: result.data.timestamp,
+        };
     });
 
     // Analyze screenshot with Vision LLM
@@ -43,7 +46,12 @@ function registerIpcHandlers() {
         try {
             const lastScreenshot = screenshot.getLastScreenshot();
             if (!lastScreenshot) {
-                return { success: false, error: 'No screenshot captured yet.' };
+                return {
+                    success: false,
+                    code: 'NO_SCREENSHOT',
+                    message: 'Press Ctrl+Alt+C before asking Intento for a response.',
+                    error: 'Press Ctrl+Alt+C before asking Intento for a response.',
+                };
             }
 
             // Smart brain injection — skip for purely technical prompts
@@ -64,7 +72,12 @@ function registerIpcHandlers() {
 
             return result;
         } catch (err) {
-            return { success: false, error: err.message };
+            return {
+                success: false,
+                code: 'ANALYZE_HANDLER_FAILED',
+                message: err.message || 'Vision analysis failed.',
+                error: err.message || 'Vision analysis failed.',
+            };
         }
     });
 
