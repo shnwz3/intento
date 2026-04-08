@@ -23,11 +23,11 @@ Intento is a lightweight desktop assistant that watches your active window and p
 
 ## Download
  
-Download the latest installer for Windows from the **[Releases](https://github.com/shnwz3/intento.ai/releases/latest)** page.
+Download the latest installer for Windows from the **[Releases](https://github.com/shnwz3/intento/releases/latest)** page.
  
 | Platform | Installer |
 |----------|-----------|
-| Windows  | [**Download Setup (v1.0.1)**](https://github.com/shnwz3/intento.ai/releases/latest/download/Intento-Setup-1.0.1.exe) |
+| Windows  | [**Download Setup (Latest)**](https://github.com/shnwz3/intento/releases/latest/download/Intento.Setup.Latest.exe) |
 
 
 > **Note:** macOS and Linux builds are not yet available. Windows 10 / 11 (64-bit) is required.
