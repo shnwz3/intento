@@ -2,6 +2,7 @@ const { globalShortcut } = require('electron');
 const { getMainWindow, setCapturing } = require('../windows/mainWindow');
 const serviceManager = require('../services/ServiceManager');
 const hudManager = require('../ui/HudManager');
+const configService = require('../services/ConfigService');
 
 const WAND_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-wand-2"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>`;
 
@@ -11,6 +12,12 @@ let smartWriterService;
 let formFillerService;
 let formAutomationService;
 let isFormAutomationRunning = false;
+
+function getConfiguredCountdown() {
+    const configured = Number(configService.getTypingConfig()?.countdownSeconds);
+    if (!Number.isFinite(configured)) return 3;
+    return Math.max(3, Math.min(15, Math.floor(configured)));
+}
 
 function registerShortcuts() {
     try {
@@ -110,7 +117,7 @@ async function triggerFormFillMode() {
             win.minimize();
         }
 
-        await hudManager.startCountdown(3, 'Focus first input. Starting in', false);
+        await hudManager.startCountdown(getConfiguredCountdown(), 'Focus first input. Starting in', false);
 
         setCapturing(true);
 
@@ -171,9 +178,16 @@ async function runShortcutFlow({ cycleMessages, successMessage, countdownMessage
         const response = await buildResponse(captureResult);
         hudManager.stopCycle();
 
+        if (response && typeof response === 'object' && response.stay) {
+            hudManager.show(`${WAND_ICON} Text is proper!`);
+            await sleep(2200);
+            hudManager.reset();
+            return;
+        }
+
         hudManager.show(`${WAND_ICON} ${successMessage}`);
         await sleep(800);
-        await hudManager.startCountdown(2, countdownMessage, false);
+        await hudManager.startCountdown(getConfiguredCountdown(), countdownMessage, false);
         await typeWithCancellation(response);
         hudManager.reset();
     } catch (error) {

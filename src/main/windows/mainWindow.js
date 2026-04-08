@@ -1,4 +1,4 @@
-const { BrowserWindow, screen } = require('electron');
+const { BrowserWindow } = require('electron');
 const path = require('path');
 const { getAppIconPath } = require('../utils/iconPath');
 
@@ -57,17 +57,18 @@ function createMainWindow(isDev) {
         mainWindow.loadFile(path.join(__dirname, '../../../dist/index.html'));
     }
 
-    // Enable F12 DevTools in both dev and production for debugging
-    mainWindow.webContents.on('before-input-event', (event, input) => {
-        if (input.type === 'keyDown') {
-            const isToggle = input.key === 'F12' ||
-                ((input.control || input.meta) && input.shift && input.key.toLowerCase() === 'i');
-            if (isToggle) {
-                mainWindow.webContents.toggleDevTools();
-                event.preventDefault();
+    if (isDev) {
+        mainWindow.webContents.on('before-input-event', (event, input) => {
+            if (input.type === 'keyDown') {
+                const isToggle = input.key === 'F12' ||
+                    ((input.control || input.meta) && input.shift && input.key.toLowerCase() === 'i');
+                if (isToggle) {
+                    mainWindow.webContents.toggleDevTools();
+                    event.preventDefault();
+                }
             }
-        }
-    });
+        });
+    }
 
     // Stealth: hide from screenshots
     mainWindow.setContentProtection(true);

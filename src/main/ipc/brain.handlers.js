@@ -1,4 +1,5 @@
 const { BrowserWindow, dialog, ipcMain } = require('electron');
+const fs = require('fs');
 const serviceManager = require('../services/ServiceManager');
 const { createBrainWindow, closeBrainWindow } = require('../windows/brainWindow');
 
@@ -32,13 +33,118 @@ function registerBrainHandlers(isDev) {
     ipcMain.handle('brain:uploadDoc', async () => {
         const result = await dialog.showOpenDialog({
             properties: ['openFile'],
-            filters: [{ name: 'Documents', extensions: ['pdf', 'txt', 'json', 'doc', 'docx'] }],
+            filters: [{ name: 'Documents', extensions: ['pdf', 'docx', 'txt', 'json'] }],
         });
 
         if (result.canceled) return { success: false, error: 'cancelled' };
         const uploadResult = await brain.uploadDocument(result.filePaths[0]);
         if (uploadResult.success) notifyBrainUpdate();
         return uploadResult;
+    });
+
+    ipcMain.handle('brain:readFileBuffer', async (_event, filePath) => {
+        try {
+            // Read file as buffer (Uint8Array) so the renderer can parse it with pdf.js
+            return await fs.promises.readFile(filePath);
+        } catch (error) {
+            console.error('readFileBuffer failed:', error);
+            return null;
+        }
+    });
+
+    ipcMain.handle('brain:extractTagsImages', async (_event, { base64Images }) => {
+        const extractionPrompt = `You are a data extraction engine. Read the following document and extract structured information.
+
+Group the information into logical HEADINGS (Categories).
+
+REQUIRED FORMAT:
+Return ONLY a valid JSON array of objects. Each object represents a HEADING and contains a list of TAGS.
+
+Example JSON Structure:
+[
+  {
+    "category": "Identity",
+    "tags": [
+      { "label": "Full Name", "value": "John Doe" },
+      { "label": "Email", "value": "john@example.com" }
+    ]
+  }
+]
+
+- Create headings that make sense for the data.
+- Extract as much relevant detail as possible.
+- Ignore generic boilerplate text.
+
+IMPORTANT: You MUST return complete, valid JSON. If the data is long, reduce the number of tags per category rather than producing incomplete JSON.`;
+
+        try {
+            const result = await vision.analyze(base64Images, '', extractionPrompt);
+            if (!result.success) {
+                return { success: false, error: result.error || result.message };
+            }
+
+            let extractedData;
+            try {
+                let cleaned = result.response.trim();
+                // We share the identical parsing and cleanup logic
+                if (cleaned.startsWith('\`\`\`')) {
+                    cleaned = cleaned.replace(/\`\`\`json?\n?/g, '').replace(/\`\`\`/g, '');
+                }
+                cleaned = cleaned.trim();
+
+                try {
+                    extractedData = JSON.parse(cleaned);
+                } catch (firstErr) {
+                    // Attempt to repair truncated JSON
+                    console.warn('AI JSON truncated, attempting repair...');
+                    let repaired = cleaned;
+
+                    // Close any unterminated string
+                    const quoteCount = (repaired.match(/(?<!\\\\)"/g) || []).length;
+                    if (quoteCount % 2 !== 0) {
+                        repaired += '"';
+                    }
+
+                    // Remove trailing comma before closing
+                    repaired = repaired.replace(/,\s*$/, '');
+
+                    // Close open braces/brackets
+                    const stack = [];
+                    for (const ch of repaired) {
+                        if (ch === '{') stack.push('}');
+                        else if (ch === '[') stack.push(']');
+                        else if (ch === '}' || ch === ']') {
+                            if (stack.length > 0) stack.pop();
+                        }
+                    }
+                    repaired += stack.reverse().join('');
+
+                    try {
+                        extractedData = JSON.parse(repaired);
+                        console.log('JSON repair succeeded');
+                    } catch (repairErr) {
+                        console.error('AI JSON Parse Error (repair also failed):', firstErr);
+                        return { success: false, error: 'AI returned incomplete data. Try uploading a smaller document or try again.', raw: result.response };
+                    }
+                }
+            } catch (outerErr) {
+                console.error('AI JSON Parse Error:', outerErr);
+                return { success: false, error: 'AI returned invalid format. Try again.', raw: result.response };
+            }
+
+            const mergeResult = brain.mergeExtractedData(extractedData);
+            if (!mergeResult.success) return mergeResult;
+
+            notifyBrainUpdate();
+            return {
+                success: true,
+                tags: mergeResult.active.tags,
+                headings: mergeResult.active.headings,
+                extracted: extractedData.length,
+            };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
     });
 
     ipcMain.handle('brain:extractTags', async (_event, { documentText }) => {
@@ -65,7 +171,9 @@ Example JSON Structure:
 - Ignore generic boilerplate text.
 
 DOCUMENT:
-${documentText.substring(0, 8000)}`;
+${documentText.substring(0, 12000)}
+
+IMPORTANT: You MUST return complete, valid JSON. If the data is long, reduce the number of tags per category rather than producing incomplete JSON.`;
 
         try {
             const result = await vision.analyzeTextOnly(extractionPrompt);
@@ -79,9 +187,46 @@ ${documentText.substring(0, 8000)}`;
                 if (cleaned.startsWith('```')) {
                     cleaned = cleaned.replace(/```json?\n?/g, '').replace(/```/g, '');
                 }
-                extractedData = JSON.parse(cleaned);
-            } catch (parseErr) {
-                console.error('AI JSON Parse Error:', parseErr);
+                cleaned = cleaned.trim();
+
+                // First try direct parse
+                try {
+                    extractedData = JSON.parse(cleaned);
+                } catch (firstErr) {
+                    // Attempt to repair truncated JSON
+                    console.warn('AI JSON truncated, attempting repair...');
+                    let repaired = cleaned;
+
+                    // Close any unterminated string
+                    const quoteCount = (repaired.match(/(?<!\\)"/g) || []).length;
+                    if (quoteCount % 2 !== 0) {
+                        repaired += '"';
+                    }
+
+                    // Remove trailing comma before closing
+                    repaired = repaired.replace(/,\s*$/, '');
+
+                    // Close open braces/brackets
+                    const stack = [];
+                    for (const ch of repaired) {
+                        if (ch === '{') stack.push('}');
+                        else if (ch === '[') stack.push(']');
+                        else if (ch === '}' || ch === ']') {
+                            if (stack.length > 0) stack.pop();
+                        }
+                    }
+                    repaired += stack.reverse().join('');
+
+                    try {
+                        extractedData = JSON.parse(repaired);
+                        console.log('JSON repair succeeded');
+                    } catch (repairErr) {
+                        console.error('AI JSON Parse Error (repair also failed):', firstErr);
+                        return { success: false, error: 'AI returned incomplete data. Try uploading a smaller document or try again.', raw: result.response };
+                    }
+                }
+            } catch (outerErr) {
+                console.error('AI JSON Parse Error:', outerErr);
                 return { success: false, error: 'AI returned invalid format. Try again.', raw: result.response };
             }
 
@@ -210,7 +355,7 @@ ${documentText.substring(0, 8000)}`;
     ipcMain.handle('doc:upload', async () => {
         const result = await dialog.showOpenDialog({
             properties: ['openFile'],
-            filters: [{ name: 'Documents', extensions: ['pdf', 'txt', 'json'] }],
+            filters: [{ name: 'Documents', extensions: ['pdf', 'docx', 'txt', 'json'] }],
         });
         if (result.canceled) return { success: false, error: 'cancelled' };
         const uploadResult = await brain.uploadDocument(result.filePaths[0]);

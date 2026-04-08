@@ -1,8 +1,45 @@
-const { ipcMain } = require('electron');
+const { dialog, ipcMain } = require('electron');
+const configService = require('../services/ConfigService');
 const serviceManager = require('../services/ServiceManager');
 
 // We will fetch services lazily or after init
 let vision, screenshot, brain;
+
+async function ensureCaptureConsent() {
+    if (configService.hasCaptureConsent()) {
+        return true;
+    }
+
+    const { getMainWindow } = require('../windows/mainWindow');
+    const ownerWindow = getMainWindow();
+    const { activeProvider } = configService.getConfig();
+    const detail = [
+        'Intento captures your full primary screen when you press Ctrl+Alt+C.',
+        `That image may be sent to your selected AI provider (${activeProvider}) to generate a response.`,
+        'Make sure no sensitive information is visible before you continue.',
+    ].join('\n\n');
+
+    const options = {
+        type: 'warning',
+        buttons: ['Continue', 'Cancel'],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true,
+        title: 'Allow Screen Analysis',
+        message: 'Intento needs permission to analyze your screen.',
+        detail,
+    };
+    const result = ownerWindow
+        ? await dialog.showMessageBox(ownerWindow, options)
+        : await dialog.showMessageBox(options);
+
+    if (result.response !== 0) {
+        return false;
+    }
+
+    configService.acceptCaptureConsent();
+    return true;
+}
 
 /**
  * Register all vision-related IPC handlers
@@ -21,24 +58,44 @@ function registerIpcHandlers() {
     // Capture screenshot
     ipcMain.handle('screenshot:capture', async () => {
         const { setCapturing } = require('../windows/mainWindow');
-        setCapturing(true);
-        const result = await screenshot.capture();
-        setCapturing(false);
+        try {
+            const hasConsent = await ensureCaptureConsent();
+            if (!hasConsent) {
+                return {
+                    success: false,
+                    code: 'CAPTURE_CONSENT_REQUIRED',
+                    message: 'Screen analysis was not approved.',
+                    error: 'Screen analysis was not approved.',
+                };
+            }
 
-        if (!result.success) {
-            console.error('Screenshot capture failed:', result.message);
-            return result;
+            setCapturing(true);
+            const result = await screenshot.capture();
+
+            if (!result.success) {
+                console.error('Screenshot capture failed:', result.message);
+                return result;
+            }
+
+            return {
+                success: true,
+                code: result.code,
+                message: result.message,
+                base64: `data:image/png;base64,${result.data.base64}`,
+                width: result.data.width,
+                height: result.data.height,
+                timestamp: result.data.timestamp,
+            };
+        } catch (error) {
+            return {
+                success: false,
+                code: 'SCREENSHOT_CAPTURE_FAILED',
+                message: error.message || 'Failed to capture the screen.',
+                error: error.message || 'Failed to capture the screen.',
+            };
+        } finally {
+            setCapturing(false);
         }
-
-        return {
-            success: true,
-            code: result.code,
-            message: result.message,
-            base64: `data:image/png;base64,${result.data.base64}`,
-            width: result.data.width,
-            height: result.data.height,
-            timestamp: result.data.timestamp,
-        };
     });
 
     // Analyze screenshot with Vision LLM

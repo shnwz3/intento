@@ -15,7 +15,7 @@ export default function MainOverlay() {
   const [hasBrain, setHasBrain] = useState(false);
   const [activeBrainName, setActiveBrainName] = useState('');
   const [typingMode, setTypingMode] = useState('type');
-  const [countdownSeconds, setCountdownSeconds] = useState(5);
+  const [countdownSeconds, setCountdownSeconds] = useState(3);
 
   const isBusy = phase === 'capturing' || phase === 'analyzing' || phase === 'typing';
 
@@ -30,7 +30,7 @@ export default function MainOverlay() {
 
     window.intentoAPI.getAIConfig().then((config) => {
       setTypingMode(config?.typing?.mode || 'type');
-      setCountdownSeconds(config?.typing?.countdownSeconds ?? 5);
+      setCountdownSeconds(config?.typing?.countdownSeconds ?? 3);
     });
 
     if (window.intentoAPI.onBrainUpdate) {
@@ -43,7 +43,7 @@ export default function MainOverlay() {
     if (window.intentoAPI.onConfigUpdate) {
       cleanupConfig = window.intentoAPI.onConfigUpdate((config) => {
         setTypingMode(config?.typing?.mode || 'type');
-        setCountdownSeconds(config?.typing?.countdownSeconds ?? 5);
+        setCountdownSeconds(config?.typing?.countdownSeconds ?? 3);
       });
     }
 
@@ -57,7 +57,7 @@ export default function MainOverlay() {
     setPhase('capturing');
     setScreenshot(null);
     setErrorMessage('');
-    setStatusMessage('Waking up Intento...');
+    setStatusMessage('Capturing your intent...');
 
     const result = await window.intentoAPI.captureScreen();
     if (result.success) {

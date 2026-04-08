@@ -1,16 +1,23 @@
 const { BrowserWindow, ipcMain, shell } = require('electron');
 const configService = require('../services/ConfigService');
+const serviceManager = require('../services/ServiceManager');
 
 function registerSettingsHandlers() {
     ipcMain.handle('getAIConfig', async () => {
-        return configService.getConfig();
+        return configService.getPublicConfig();
     });
 
-    ipcMain.handle('saveAIConfig', async (_event, config) => {
-        const result = configService.saveConfig(config);
+    ipcMain.handle('saveAIConfig', async (_event, payload) => {
+        const hasPublicPayload = Boolean(payload?.config || payload?.keyUpdates || payload?.clearKeys);
+        const result = hasPublicPayload
+            ? configService.savePublicConfig(payload.config || {}, {
+                keyUpdates: payload.keyUpdates || {},
+                clearKeys: payload.clearKeys || [],
+            })
+            : configService.saveConfig(payload);
+        const publicConfig = result.publicConfig || configService.getPublicConfig();
 
         try {
-            const serviceManager = require('../services/ServiceManager');
             const vision = serviceManager.get('VisionService');
             vision.refreshProviders();
         } catch (e) {
@@ -18,10 +25,13 @@ function registerSettingsHandlers() {
         }
 
         BrowserWindow.getAllWindows().forEach((win) => {
-            win.webContents.send('config:update', result.config);
+            win.webContents.send('config:update', publicConfig);
         });
 
-        return result;
+        return {
+            ...result,
+            config: publicConfig,
+        };
     });
 
     ipcMain.handle('getProviderOverview', async () => {

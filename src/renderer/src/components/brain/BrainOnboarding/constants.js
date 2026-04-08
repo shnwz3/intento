@@ -16,24 +16,6 @@ export const PROVIDER_METADATA = {
     openrouter: { name: 'OPENROUTER', url: 'https://openrouter.ai/settings/keys' }
 };
 
-export const OUTPUT_MODE_OPTIONS = [
-    {
-        id: 'type',
-        label: 'Auto Type',
-        description: 'Intento types characters directly into the active app.',
-    },
-    {
-        id: 'paste',
-        label: 'Paste',
-        description: 'Intento pastes the full response at once with Ctrl+V.',
-    },
-    {
-        id: 'clipboard_only',
-        label: 'Clipboard Only',
-        description: 'Intento copies the result and lets you paste it manually.',
-    },
-];
-
 export const TAG_OPTIONS = {
     'Communication Tone': [
         'Professional',

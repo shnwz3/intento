@@ -1,7 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const { app } = require('electron');
-const pdf = require('pdf-parse');
+const {
+    SUPPORTED_DOCUMENT_EXTENSIONS,
+    createDocumentLoader,
+} = require('./documentLoader');
 
 const PERSONALITY_TAGS = new Set(['Communication Tone', 'Personality Traits', 'Reply Style']);
 
@@ -11,6 +14,7 @@ class BrainService {
         this.path = options.path || path;
         this.app = options.app || app;
         this.brainPath = options.brainPath || this.path.join(this.app.getPath('userData'), 'brain.json');
+        this.documentLoader = options.documentLoader || createDocumentLoader();
         this.brains = {};
         this.activeBrainId = 'default';
         this.activeAgentId = 'no_agent';
@@ -216,11 +220,10 @@ class BrainService {
             );
 
             if (Object.keys(this.brains).length === 0) {
-                this._createInitialBrain();
-                return;
+                console.log('Brains loaded: 0 profiles');
             }
 
-            this.activeBrainId = this.brains[data.activeBrainId] ? data.activeBrainId : Object.keys(this.brains)[0];
+            this.activeBrainId = this.brains[data.activeBrainId] ? data.activeBrainId : (Object.keys(this.brains)[0] || null);
             this.activeAgentId = data?.activeAgentId || 'no_agent';
 
             this._repairData();
@@ -351,14 +354,13 @@ class BrainService {
     }
 
     deleteBrain(id) {
-        if (Object.keys(this.brains).length <= 1) {
-            return this._failure('LAST_BRAIN', 'Cannot delete the only brain profile.');
-        }
         if (!this.brains[id]) return this._failure('BRAIN_NOT_FOUND', 'Brain not found.');
 
         delete this.brains[id];
-        if (this.activeBrainId === id) {
-            this.activeBrainId = Object.keys(this.brains)[0];
+        const remainingBrains = Object.keys(this.brains);
+        
+        if (this.activeBrainId === id || !this.brains[this.activeBrainId]) {
+            this.activeBrainId = remainingBrains.length > 0 ? remainingBrains[0] : null;
         }
 
         const saveResult = this._saveToDisk();
@@ -629,24 +631,22 @@ class BrainService {
         if (!active) return this._failure('NO_ACTIVE_BRAIN', 'No active brain.');
 
         const ext = this.path.extname(filePath).toLowerCase();
+        if (!SUPPORTED_DOCUMENT_EXTENSIONS.has(ext)) {
+            return this._failure('UNSUPPORTED_DOCUMENT_TYPE', 'Please upload a PDF, DOCX, TXT, or JSON file.');
+        }
 
         try {
-            let text = '';
-            if (ext === '.pdf') {
-                const dataBuffer = this.fs.readFileSync(filePath);
-                const data = await pdf(dataBuffer);
-                text = data.text;
-            } else {
-                text = this.fs.readFileSync(filePath, 'utf8');
-            }
-
+            const { text } = await this.documentLoader(filePath);
             active.rawDocText = text;
             const saveResult = this._saveToDisk();
             if (!saveResult.success) return saveResult;
             console.log(`Document loaded for [${active.name}]: ${text.length} chars`);
-            return this._success({ text, fileName: this.path.basename(filePath) });
+            return this._success({ text, fileName: this.path.basename(filePath), ext, filePath });
         } catch (error) {
-            return this._failure('DOCUMENT_UPLOAD_FAILED', error.message || 'Failed to load document.');
+            return this._failure(
+                error.code || 'DOCUMENT_UPLOAD_FAILED',
+                error.message || 'Failed to load document.'
+            );
         }
     }
 

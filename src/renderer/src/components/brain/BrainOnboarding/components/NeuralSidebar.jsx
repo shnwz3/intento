@@ -41,9 +41,13 @@ export default function NeuralSidebar({
               <span className={styles.navName}>{b.name}</span>
               <span className={styles.navMeta}>{b.filledCount || 0}/{b.tagCount || 0} Trained</span>
             </div>
-            {!b.isActive && brains.length > 1 && (
-              <button className={styles.navDelete} onClick={(e) => handleDeleteBrain(b.id, e)}><X size={12} /></button>
-            )}
+            <button 
+              className={`${styles.navDelete} ${b.isActive ? styles.deleteVisible : ''}`} 
+              onClick={(e) => handleDeleteBrain(b.id, e)}
+              title="Delete Brain"
+            >
+              <X size={12} />
+            </button>
           </div>
         ))}
       </div>

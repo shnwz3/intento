@@ -28,10 +28,15 @@ class SmartWriterService {
 
         const directive = this._getDirective();
         const prompt = promptService.getRewritePrompt(directive);
-        // Rewrite is mechanical, usually no brain context needed
         const brainContext = '';
 
-        return this._analyze(screenshotData, text, prompt, brainContext);
+        const response = await this._analyze(screenshotData, text, prompt, brainContext);
+        
+        if (typeof response === 'string' && response.includes('NO_CHANGE_NEEDED')) {
+            return { stay: true, original: text };
+        }
+        
+        return response;
     }
 
     /**

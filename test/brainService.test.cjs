@@ -88,4 +88,46 @@ module.exports = [
             assert.equal(service.getContext().includes('Full Name: Feroz'), true);
         },
     },
+    {
+        name: 'BrainService delegates document parsing to the loader and persists the result',
+        async run() {
+            const BrainService = loadBrainService();
+            const dir = makeTempDir();
+            const service = new BrainService({
+                app: { getPath: () => dir },
+                brainPath: path.join(dir, 'brain.json'),
+                documentLoader: async (filePath) => ({
+                    text: `loaded:${path.basename(filePath)}`,
+                }),
+            });
+
+            const result = await service.uploadDocument(path.join(dir, 'notes.txt'));
+
+            assert.equal(result.success, true);
+            assert.equal(result.text, 'loaded:notes.txt');
+            assert.equal(service.getActiveBrain().rawDocText, 'loaded:notes.txt');
+        },
+    },
+    {
+        name: 'BrainService rejects unsupported document types before loading',
+        async run() {
+            const BrainService = loadBrainService();
+            const dir = makeTempDir();
+            let called = false;
+            const service = new BrainService({
+                app: { getPath: () => dir },
+                brainPath: path.join(dir, 'brain.json'),
+                documentLoader: async () => {
+                    called = true;
+                    return { text: 'should not happen' };
+                },
+            });
+
+            const result = await service.uploadDocument(path.join(dir, 'resume.doc'));
+
+            assert.equal(result.success, false);
+            assert.equal(result.code, 'UNSUPPORTED_DOCUMENT_TYPE');
+            assert.equal(called, false);
+        },
+    },
 ];

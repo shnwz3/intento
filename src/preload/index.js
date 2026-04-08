@@ -25,6 +25,9 @@ contextBridge.exposeInMainWorld('intentoAPI', {
     brainUploadDoc: () => ipcRenderer.invoke('brain:uploadDoc'),
     brainExtractTags: (documentText) =>
         ipcRenderer.invoke('brain:extractTags', { documentText }),
+    brainExtractTagsImages: (base64Images) =>
+        ipcRenderer.invoke('brain:extractTagsImages', { base64Images }),
+    brainReadFileBuffer: (filePath) => ipcRenderer.invoke('brain:readFileBuffer', filePath),
     brainSaveTags: (tags) => ipcRenderer.invoke('brain:saveTags', tags),
     brainGetTags: () => ipcRenderer.invoke('brain:getTags'),
 

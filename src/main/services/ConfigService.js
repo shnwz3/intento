@@ -1,5 +1,6 @@
 const Store = require('electron-store');
 const axios = require('axios');
+const { app, safeStorage } = require('electron');
 
 const ENV_KEY_MAP = {
     GROK_API_KEY: 'grok',
@@ -15,6 +16,8 @@ const PROVIDER_ENDPOINTS = {
     anthropic: 'https://api.anthropic.com/v1',
     openrouter: 'https://openrouter.ai/api/v1',
 };
+
+const SECRET_STORE_KEY = 'ai_secrets';
 
 const DEFAULT_AI_CONFIG = {
     activeProvider: 'grok',
@@ -34,15 +37,57 @@ const DEFAULT_AI_CONFIG = {
     },
     typing: {
         mode: 'type',
-        countdownSeconds: 5,
+        countdownSeconds: 3,
+    },
+    privacy: {
+        captureConsentAcceptedAt: null,
     },
 };
 
+function clampCountdown(value) {
+    const seconds = Number(value);
+    if (!Number.isFinite(seconds)) return DEFAULT_AI_CONFIG.typing.countdownSeconds;
+    return Math.max(3, Math.min(15, Math.floor(seconds)));
+}
+
 class ConfigService {
-    constructor() {
-        this.store = new Store();
+    constructor(options = {}) {
+        this.store = options.store || new Store();
+        this.safeStorage = options.safeStorage || safeStorage;
+        this._initialized = false;
+        this._initialize();
+    }
+
+    _initialize() {
+        const canObserveAppReady = typeof app?.isReady === 'function' && typeof app?.once === 'function';
+
+        if (!canObserveAppReady || app.isReady()) {
+            this._finishInitialization();
+            return;
+        }
+
+        app.once('ready', () => {
+            this._finishInitialization();
+        });
+    }
+
+    _finishInitialization() {
+        if (this._initialized) return;
+
+        this._initialized = true;
         this._initDefaults();
         this._syncEnvKeys();
+    }
+
+    _emptyKeys() {
+        return { ...DEFAULT_AI_CONFIG.keys };
+    }
+
+    _stripSecretKeys(config = {}) {
+        return {
+            ...config,
+            keys: this._emptyKeys(),
+        };
     }
 
     _normalizeConfig(config = {}) {
@@ -60,57 +105,229 @@ class ConfigService {
             typing: {
                 ...DEFAULT_AI_CONFIG.typing,
                 ...(config.typing || {}),
+                mode: 'type',
+                countdownSeconds: clampCountdown(config.typing?.countdownSeconds ?? DEFAULT_AI_CONFIG.typing.countdownSeconds),
+            },
+            privacy: {
+                ...DEFAULT_AI_CONFIG.privacy,
+                ...(config.privacy || {}),
             },
         };
     }
 
+    _getStoredConfig() {
+        return this._normalizeConfig(this.store.get('ai_config'));
+    }
+
+    _decodeSecret(value) {
+        if (!value || typeof value !== 'string') return '';
+
+        if (value.startsWith('enc:')) {
+            if (!this._canUseSafeStorage()) {
+                return '';
+            }
+            const encrypted = Buffer.from(value.slice(4), 'base64');
+            return this.safeStorage?.decryptString ? this.safeStorage.decryptString(encrypted) : '';
+        }
+
+        if (value.startsWith('plain:')) {
+            return Buffer.from(value.slice(6), 'base64').toString('utf8');
+        }
+
+        return value;
+    }
+
+    _encodeSecret(value) {
+        if (!value) return '';
+
+        if (this._canUseSafeStorage() && this.safeStorage?.isEncryptionAvailable?.()) {
+            const encrypted = this.safeStorage.encryptString(value);
+            return `enc:${encrypted.toString('base64')}`;
+        }
+
+        return `plain:${Buffer.from(value, 'utf8').toString('base64')}`;
+    }
+
+    _canUseSafeStorage() {
+        return typeof app?.isReady !== 'function' || app.isReady();
+    }
+
+    _readStoredSecrets() {
+        const rawSecrets = this.store.get(SECRET_STORE_KEY);
+        const secrets = this._emptyKeys();
+
+        if (!rawSecrets || typeof rawSecrets !== 'object') {
+            return secrets;
+        }
+
+        for (const providerId of Object.keys(secrets)) {
+            secrets[providerId] = this._decodeSecret(rawSecrets[providerId]);
+        }
+
+        return secrets;
+    }
+
+    _writeStoredSecrets(secrets = {}) {
+        const serialized = {};
+
+        for (const providerId of Object.keys(this._emptyKeys())) {
+            const value = String(secrets[providerId] || '').trim();
+            if (value) {
+                serialized[providerId] = this._encodeSecret(value);
+            }
+        }
+
+        this.store.set(SECRET_STORE_KEY, serialized);
+    }
+
+    _resolveKeys() {
+        const resolved = this._readStoredSecrets();
+
+        for (const [envVar, providerId] of Object.entries(ENV_KEY_MAP)) {
+            const envValue = process.env[envVar];
+            if (envValue) {
+                resolved[providerId] = envValue;
+            }
+        }
+
+        return resolved;
+    }
+
+    _buildKeyStatus(keys = this._resolveKeys()) {
+        return Object.fromEntries(
+            Object.keys(this._emptyKeys()).map((providerId) => [
+                providerId,
+                Boolean(keys[providerId] && keys[providerId].trim()),
+            ])
+        );
+    }
+
+    _storeConfig(config) {
+        const sanitized = this._stripSecretKeys(this._normalizeConfig(config));
+        this.store.set('ai_config', sanitized);
+        return sanitized;
+    }
+
+    _migratePlaintextKeys(config) {
+        const storedSecrets = this._readStoredSecrets();
+        let changed = false;
+
+        for (const providerId of Object.keys(this._emptyKeys())) {
+            const plaintextValue = String(config.keys?.[providerId] || '').trim();
+            if (plaintextValue && !storedSecrets[providerId]) {
+                storedSecrets[providerId] = plaintextValue;
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            this._writeStoredSecrets(storedSecrets);
+        }
+
+        return changed;
+    }
+
     _initDefaults() {
-        const config = this.store.get('ai_config');
-        const normalized = this._normalizeConfig(config);
-        this.store.set('ai_config', normalized);
+        const normalized = this._normalizeConfig(this.store.get('ai_config'));
+        this._migratePlaintextKeys(normalized);
+        this._storeConfig(normalized);
     }
 
     _syncEnvKeys() {
-        const config = this.getConfig();
-        let changed = false;
+        const config = this._getStoredConfig();
         let firstEnvProvider = null;
 
         for (const [envVar, providerId] of Object.entries(ENV_KEY_MAP)) {
             const envValue = process.env[envVar];
             if (envValue) {
-                if (config.keys[providerId] !== envValue) {
-                    config.keys[providerId] = envValue;
-                    changed = true;
-                    console.log(`Synced ${envVar} -> ${providerId}`);
-                }
                 if (!firstEnvProvider) firstEnvProvider = providerId;
             }
         }
 
-        if (!config.keys[config.activeProvider] && firstEnvProvider) {
+        const resolvedKeys = this._resolveKeys();
+        if (!resolvedKeys[config.activeProvider] && firstEnvProvider) {
             config.activeProvider = firstEnvProvider;
-            changed = true;
             console.log(`Auto-switched to ${firstEnvProvider} (has env key)`);
-        }
-
-        if (changed) {
-            this.store.set('ai_config', config);
+            this._storeConfig(config);
         }
     }
 
     getConfig() {
-        return this._normalizeConfig(this.store.get('ai_config'));
+        const config = this._getStoredConfig();
+        return {
+            ...config,
+            keys: this._resolveKeys(),
+        };
+    }
+
+    getPublicConfig() {
+        const config = this._getStoredConfig();
+        return {
+            ...config,
+            keys: this._emptyKeys(),
+            keyStatus: this._buildKeyStatus(),
+        };
     }
 
     saveConfig(config) {
         const normalized = this._normalizeConfig(config);
-        this.store.set('ai_config', normalized);
+        this._writeStoredSecrets(normalized.keys);
+        this._storeConfig(normalized);
         console.log('Config saved:', normalized.activeProvider, normalized.typing.mode);
-        return { success: true, config: normalized };
+        return {
+            success: true,
+            config: this.getConfig(),
+            publicConfig: this.getPublicConfig(),
+        };
+    }
+
+    savePublicConfig(config, { keyUpdates = {}, clearKeys = [] } = {}) {
+        const current = this.getConfig();
+        const nextKeys = {
+            ...current.keys,
+            ...keyUpdates,
+        };
+
+        for (const providerId of clearKeys) {
+            nextKeys[providerId] = '';
+        }
+
+        return this.saveConfig({
+            ...current,
+            ...config,
+            models: {
+                ...current.models,
+                ...(config.models || {}),
+            },
+            typing: {
+                ...current.typing,
+                ...(config.typing || {}),
+            },
+            privacy: {
+                ...current.privacy,
+                ...(config.privacy || {}),
+            },
+            keys: nextKeys,
+        });
     }
 
     getTypingConfig() {
         return this.getConfig().typing;
+    }
+
+    getPrivacyConfig() {
+        return this.getConfig().privacy;
+    }
+
+    hasCaptureConsent() {
+        return Boolean(this.getPrivacyConfig().captureConsentAcceptedAt);
+    }
+
+    acceptCaptureConsent(acceptedAt = new Date().toISOString()) {
+        const config = this._getStoredConfig();
+        config.privacy.captureConsentAcceptedAt = acceptedAt;
+        this._storeConfig(config);
+        return { success: true, config: this.getPublicConfig() };
     }
 
     getProviderOverview() {
@@ -230,3 +447,4 @@ class ConfigService {
 }
 
 module.exports = new ConfigService();
+module.exports.ConfigService = ConfigService;

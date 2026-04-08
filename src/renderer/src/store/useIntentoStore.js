@@ -63,7 +63,7 @@ const useIntentoStore = create((set, get) => ({
     /**
      * Type last response at cursor
      */
-    typeResponse: async (countdown = 5) => {
+    typeResponse: async (countdown = 3) => {
         const { lastResponse, setTyping } = get();
         if (!lastResponse) return;
 
@@ -71,6 +71,19 @@ const useIntentoStore = create((set, get) => ({
         await window.intentoAPI.typeAtCursor(lastResponse, countdown);
         setTyping(false);
     },
+
+    // ============ GLOBAL STATUS ============
+    globalStatus: {
+        type: 'idle', // 'idle' | 'loading' | 'uploading' | 'deleting' | 'analyzing' | 'success' | 'error'
+        message: '',
+        subMessage: '',
+    },
+
+    setGlobalStatus: (type, message, subMessage = '') => 
+        set({ globalStatus: { type, message, subMessage } }),
+    
+    clearGlobalStatus: () => 
+        set({ globalStatus: { type: 'idle', message: '', subMessage: '' } }),
 
     /**
      * Reset state
@@ -82,6 +95,7 @@ const useIntentoStore = create((set, get) => ({
             lastResponse: '',
             error: null,
             isTyping: false,
+            globalStatus: { type: 'idle', message: '', subMessage: '' },
         }),
 }));
 

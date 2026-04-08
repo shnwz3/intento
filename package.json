@@ -2,7 +2,6 @@
     "name": "intento-app",
     "version": "1.0.1",
     "description": "Intento - AI-powered cursor assistant for intelligent text responses",
-
     "author": "Intento Team",
     "main": "src/main/index.js",
     "scripts": {
@@ -31,6 +30,7 @@
         "ollama": "^0.5.8",
         "openai": "^6.18.0",
         "pdf-parse": "^1.1.1",
+        "pdfjs-dist": "^5.5.207",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
         "zustand": "^4.5.0"
@@ -69,8 +69,6 @@
                 "repo": "intento.ai"
             }
         ],
-
-
         "files": [
             "src/main/**/*",
             "src/preload/**/*",

@@ -1,0 +1,253 @@
+/* --- Keyframes (Premium Motion Design) --- */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes scan {
+    0%, 100% { transform: translateY(0); opacity: 0.2; }
+    50% { transform: translateY(30px); opacity: 0.8; }
+}
+
+@keyframes neuralPulse {
+    0%, 100% { transform: scale(1); opacity: 0.8; }
+    50% { transform: scale(1.25); opacity: 1; filter: drop-shadow(0 0 5px rgba(139, 92, 246, 0.4)); }
+}
+
+@keyframes shatter {
+    0% { transform: translate(0, 0) scale(1) rotate(0); opacity: 1; }
+    100% { transform: translate(var(--tx), var(--ty)) scale(0) rotate(var(--tr)); opacity: 0; }
+}
+
+@keyframes progressFlow {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+@keyframes badgePulse {
+    0% { opacity: 0.4; transform: scale(0.9); }
+    50% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0.4; transform: scale(0.9); }
+}
+
+/* --- Base Layout --- */
+.overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease-out;
+
+    &.visible {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+
+.dynamicBackground {
+    position: absolute;
+    inset: 0;
+    background: rgba(9, 9, 11, 0.6);
+    backdrop-filter: blur(24px);
+    z-index: -1;
+}
+
+.lightLeak {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 400px;
+    height: 400px;
+    border-radius: 50%;
+    filter: blur(100px);
+    opacity: 0.2;
+    z-index: -2;
+    transition: background 1s ease;
+    background: radial-gradient(circle, #3b82f6 0%, transparent 70%);
+}
+
+.uploading .lightLeak { background-color: #10b981; }
+.deleting .lightLeak { background-color: #ef4444; }
+.analyzing .lightLeak { background-color: #8b5cf6; }
+.success .lightLeak { background-color: #22c55e; }
+.error .lightLeak { background-color: #ef4444; }
+
+/* --- Glass Container (Professional UX Alignment) --- */
+.glassContainer {
+    background: rgba(24, 24, 27, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 
+        0 20px 50px rgba(0, 0, 0, 0.5),
+        inset 0 0 10px rgba(255, 255, 255, 0.02);
+    border-radius: 20px;
+    padding: 24px 28px;
+    width: 360px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    transform: translateY(12px) scale(0.98);
+    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    .visible & {
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* --- Main Grid Content --- */
+.mainGrid {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    align-items: center;
+    gap: 18px;
+}
+
+.visualContainer {
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.premiumIcon {
+    width: 100%;
+    height: 100%;
+    color: #3b82f6;
+
+    svg {
+        width: 100%;
+        height: 100%;
+        fill: none;
+        stroke: currentColor;
+    }
+}
+
+/* Animations Logic */
+.docBg { fill: rgba(16, 185, 129, 0.1); stroke: #10b981; stroke-width: 2; }
+.scanLine { fill: #10b981; animation: scan 2s linear infinite; }
+.outerRing { stroke: rgba(16, 185, 129, 0.15); animation: spin 8s linear infinite; }
+.outerRingDanger { stroke: rgba(239, 68, 68, 0.2); animation: spin 4s linear infinite; }
+
+.shard { fill: #ef4444; animation: shatter 1.2s ease-out infinite; }
+.shard:nth-child(1) { --tx: -20px; --ty: -20px; --tr: -90deg; }
+.shard:nth-child(2) { --tx: 20px; --ty: -15px; --tr: 120deg; }
+.shard:nth-child(3) { --tx: -15px; --ty: 20px; --tr: 60deg; }
+.shard:nth-child(4) { --tx: 15px; --ty: 15px; --tr: -45deg; }
+
+.neuralCore { fill: #8b5cf6; }
+.node { fill: #c084fc; animation: neuralPulse 2s ease-in-out infinite; }
+.node:nth-child(2) { animation-delay: 0.5s; }
+.orbitRing { stroke: rgba(139, 92, 246, 0.1); }
+
+.successCircle { fill: rgba(34, 197, 94, 0.1); stroke: #22c55e; }
+.checkPath { color: #22c55e; stroke-dasharray: 60; stroke-dashoffset: 60; animation: drawCheck 0.5s ease-out forwards; }
+
+.errorCircle { fill: rgba(239, 68, 68, 0.1); stroke: #ef4444; }
+.crossPath { color: #ef4444; stroke-dasharray: 60; stroke-dashoffset: 60; animation: drawCheck 0.4s ease-out forwards; }
+
+@keyframes drawCheck { to { stroke-dashoffset: 0; } }
+
+/* --- Typography (Professional Standards) --- */
+.textContainer {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.title {
+    color: #fff;
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0 0 2px 0;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+}
+
+.subtitle {
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 0.85rem;
+    font-weight: 400;
+    margin: 0;
+    line-height: 1.4;
+    max-width: 240px;
+}
+
+/* --- Status Footer & Progress --- */
+.statusFooter {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.infoRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pulseIndicator {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #3b82f6;
+    animation: badgePulse 1.5s ease-in-out infinite;
+}
+
+.statusLabel {
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.35);
+    letter-spacing: 0.08em;
+}
+
+.progressTrack {
+    height: 3px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progressFill {
+    position: absolute;
+    inset: 0;
+    width: 40%;
+    background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+    animation: progressFlow 2s linear infinite;
+    border-radius: 10px;
+}
+
+/* Action Button */
+.actionBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+
+    &:hover {
+        background: rgba(239, 68, 68, 0.2);
+        border-color: rgba(239, 68, 68, 0.4);
+    }
+}
+
+/* Status variants */
+.uploading .pulseIndicator, .uploading .progressFill { background: #10b981; }
+.deleting .pulseIndicator, .deleting .progressFill { background: #ef4444; }
+.analyzing .pulseIndicator, .analyzing .progressFill { background: #8b5cf6; }
+.success .pulseIndicator { background: #22c55e; }

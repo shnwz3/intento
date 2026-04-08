@@ -239,12 +239,26 @@
     border: none;
     color: #ef4444;
     cursor: pointer;
-    padding: 4px;
-    transition: opacity 0.2s;
+    padding: 8px;
+    margin: -4px;
+    border-radius: 6px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover {
+        background: rgba(239, 68, 68, 0.1);
+        opacity: 1 !important;
+    }
+}
+
+.deleteVisible {
+    opacity: 0.3 !important;
 }
 
 .brainNavItem:hover .navDelete {
-    opacity: 0.6;
+    opacity: 0.8;
 }
 
 .sidebarFooter {
@@ -1526,12 +1540,20 @@
 
 .providerGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+
+    @media (max-width: 560px) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    @media (max-width: 380px) {
+        grid-template-columns: 1fr;
+    }
 }
 
 .providerBtn {
-    padding: 12px;
+    padding: 10px 12px;
     background: rgba(0, 0, 0, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 12px;
@@ -1542,6 +1564,12 @@
     cursor: pointer;
     transition: all 0.2s;
     position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    min-height: 76px;
+    text-align: left;
 
     &:hover {
         background: rgba(255, 255, 255, 0.05);
@@ -1549,11 +1577,24 @@
     }
 }
 
+.providerTopRow {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.providerName {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+}
+
 .providerStatusPill {
     display: inline-flex;
     align-items: center;
     width: fit-content;
-    margin-top: 8px;
     padding: 3px 8px;
     border-radius: 999px;
     font-size: 9px;
@@ -1598,30 +1639,19 @@
 }
 
 .recommendBadge {
-    position: absolute;
-    top: -6px;
-    right: -6px;
     background: #6366f1;
     color: #fff;
     font-size: 8px;
     font-weight: 800;
-    padding: 2px 6px;
+    padding: 2px 7px;
     border-radius: 6px;
     box-shadow: 0 4px 10px rgba(99, 102, 241, 0.4);
+    line-height: 1.1;
+    white-space: nowrap;
 }
 
 .providerConnected {
     border-bottom: 2px solid #6366f1;
-}
-
-.activeDot {
-    display: inline-block;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #6366f1;
-    margin-left: 6px;
-    box-shadow: 0 0 6px rgba(99, 102, 241, 0.6);
 }
 
 .keyManagement {

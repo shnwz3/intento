@@ -136,15 +136,14 @@ class VisionService {
     async analyze(imageBase64, selectedText = '', prompt = '', brainContext = '') {
         const userPrompt = this._buildVisionPrompt(selectedText, prompt, brainContext);
         const base64 = this._normalizeImageBase64(imageBase64);
-
         const configuredProviders = this.providers.filter((provider) => provider.name !== 'Ollama');
         const failures = [];
 
         for (let i = 0; i < this.providers.length; i++) {
             const idx = (this.currentIndex + i) % this.providers.length;
             const provider = this.providers[idx];
-
             const result = await this._tryProvider(provider, base64, userPrompt);
+
             if (result.success) {
                 this.currentIndex = idx;
                 return result;
@@ -173,16 +172,17 @@ class VisionService {
         };
     }
 
-    _normalizeImageBase64(imageBase64) {
-        if (Buffer.isBuffer(imageBase64)) {
-            return imageBase64.toString('base64');
+    _normalizeImageBase64(input) {
+        if (Array.isArray(input)) {
+            return input.map(item => this._normalizeImageBase64(item));
         }
-
-        if (typeof imageBase64 !== 'string') {
-            return imageBase64;
+        if (Buffer.isBuffer(input)) {
+            return input.toString('base64');
         }
-
-        return imageBase64.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, '');
+        if (typeof input !== 'string') {
+            return input;
+        }
+        return input.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, '');
     }
 
     async _tryProvider(provider, base64, userPrompt) {
@@ -301,7 +301,7 @@ class VisionService {
                     { role: 'system', content: promptService.TEXT_ONLY_SYSTEM_PROMPT },
                     { role: 'user', content: prompt },
                 ],
-                max_tokens: 1000,
+                max_tokens: 4000,
                 temperature: 0.3,
             });
 
@@ -323,7 +323,7 @@ class VisionService {
         }
     }
 
-    async _callOpenAICompatible(apiKey, providerCfg, base64Image, userPrompt) {
+    async _callOpenAICompatible(apiKey, providerCfg, base64Images, userPrompt) {
         const clientOpts = {
             apiKey,
             baseURL: providerCfg.baseURL,
@@ -333,6 +333,18 @@ class VisionService {
         }
 
         const client = new OpenAI(clientOpts);
+        const images = Array.isArray(base64Images) ? base64Images : [base64Images];
+
+        const contentArray = [
+            { type: 'text', text: userPrompt }
+        ];
+
+        for (const b64 of images) {
+            contentArray.push({
+                type: 'image_url',
+                image_url: { url: `data:image/png;base64,${b64}` }
+            });
+        }
 
         const response = await client.chat.completions.create({
             model: providerCfg.visionModel,
@@ -340,13 +352,7 @@ class VisionService {
                 { role: 'system', content: aiConfig.system_prompt },
                 {
                     role: 'user',
-                    content: [
-                        { type: 'text', text: userPrompt },
-                        {
-                            type: 'image_url',
-                            image_url: { url: `data:image/png;base64,${base64Image}` },
-                        },
-                    ],
+                    content: contentArray,
                 },
             ],
             max_tokens: aiConfig.model_params.max_tokens || 500,
@@ -356,25 +362,32 @@ class VisionService {
         return response.choices[0].message.content;
     }
 
-    async _callGemini(apiKey, base64Image, userPrompt) {
+    async _callGemini(apiKey, base64Images, userPrompt) {
         const { GoogleGenerativeAI } = require('@google/generative-ai');
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-        const result = await model.generateContent([
-            { text: `${aiConfig.system_prompt}\n\nTask: ${userPrompt}` },
-            { inlineData: { data: base64Image, mimeType: 'image/png' } },
-        ]);
+        const images = Array.isArray(base64Images) ? base64Images : [base64Images];
+        const parts = [
+            { text: `${aiConfig.system_prompt}\n\nTask: ${userPrompt}` }
+        ];
+
+        for (const b64 of images) {
+            parts.push({ inlineData: { data: b64, mimeType: 'image/png' } });
+        }
+
+        const result = await model.generateContent(parts);
 
         return (await result.response).text();
     }
 
-    async _callOllama(base64Image, userPrompt) {
+    async _callOllama(base64Images, userPrompt) {
         const ollama = require('ollama').default;
+        const images = Array.isArray(base64Images) ? base64Images : [base64Images];
         const response = await ollama.generate({
             model: 'moondream',
             prompt: `Instruction: ${aiConfig.system_prompt}\n\nTask: ${userPrompt}`,
-            images: [base64Image],
+            images: images,
             stream: false,
         });
         return response.response;

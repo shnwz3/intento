@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import styles from './BrainOnboarding.module.scss';
-import { Menu, ChevronLeft, ChevronDown, Upload, Plus, Save } from 'lucide-react';
+import { Menu, ChevronLeft, ChevronDown, Upload, Plus, Save, LayoutGrid } from 'lucide-react';
+import useIntentoStore from '../../../store/useIntentoStore';
 
 // Drag & Drop
 import {
@@ -51,7 +52,10 @@ export default function BrainOnboarding() {
     const [activeTab, setActiveTab] = useState('identity'); // 'identity', 'personality', 'sync', 'settings'
     const [activeAgentId, setActiveAgentId] = useState('no_agent');
     const [showVoiceSettings, setShowVoiceSettings] = useState(false);
-    const [status, setStatus] = useState('');
+    
+    // Global Status from Store
+    const { setGlobalStatus, clearGlobalStatus } = useIntentoStore();
+
     const [isLoading, setIsLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
     const [brainToDelete, setBrainToDelete] = useState(null);
@@ -106,10 +110,16 @@ export default function BrainOnboarding() {
                     );
                 }
                 setShowVoiceSettings(hasTraits);
+            } else {
+                setActiveBrain(null);
+                setTags([]);
+                setHeadings([]);
+                setActiveAgentId('no_agent');
+                setRenameValue('');
             }
         } catch (error) {
             console.error('Failed to load brain data:', error);
-            setStatus('System Sync Error');
+            setGlobalStatus('error', 'System Sync Error', 'Could not retrieve brain profiles.');
         }
         setIsLoading(false);
     }, []);
@@ -157,7 +167,7 @@ export default function BrainOnboarding() {
             setNewBrainName('');
             setShowAddModal(false);
             loadBrainData();
-            setStatus(`Initialized: ${newBrainName}`);
+            setGlobalStatus('success', 'Brain Initialized', `Module "${newBrainName}" is ready.`);
         }
     };
 
@@ -174,11 +184,12 @@ export default function BrainOnboarding() {
 
     const confirmDelete = async () => {
         if (!brainToDelete) return;
+        setGlobalStatus('deleting', 'Decommissioning Brain...', `Removing "${brainToDelete.name}" from neural network.`);
         const result = await window.intentoAPI.brainDeleteProfile(brainToDelete.id);
         if (result.success) {
             loadBrainData();
             setBrainToDelete(null);
-            setStatus(`Decommissioned: ${brainToDelete.name}`);
+            setGlobalStatus('success', 'Brain Decommissioned', `Module "${brainToDelete.name}" was removed.`);
         }
     };
 
@@ -228,7 +239,7 @@ export default function BrainOnboarding() {
         const result = await window.intentoAPI.brainAddTag(headingId, label, value);
         if (result.success) {
              setTags(prev => [...prev, result.tag]);
-             setStatus('Saved instantly');
+             setGlobalStatus('success', 'Data Saved', `Path "${label}" mapped successfully.`);
         }
     };
 
@@ -236,7 +247,7 @@ export default function BrainOnboarding() {
         const result = await window.intentoAPI.brainUpdateTag(id, updates);
         if (result.success) {
             setTags(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
-            setStatus('Saved instantly');
+            setGlobalStatus('success', 'Data Updated', 'Changes synchronized.');
         }
     };
 
@@ -244,7 +255,7 @@ export default function BrainOnboarding() {
         const result = await window.intentoAPI.brainDeleteTag(id);
         if (result.success) {
             setTags(prev => prev.filter(t => t.id !== id));
-            setStatus('Saved instantly');
+            setGlobalStatus('success', 'Tag Removed', 'Synaptic path deleted.');
         }
     };
 
@@ -322,8 +333,6 @@ export default function BrainOnboarding() {
         }
 
         // 2. Add tags from template
-        const newTags = [];
-        // Map template tags to labels expected by TAG_OPTIONS
         const mapping = {
             'default_tone': 'Communication Tone',
             'default_personality': 'Personality Traits',
@@ -352,42 +361,77 @@ export default function BrainOnboarding() {
         const res = await window.intentoAPI.brainSetActiveAgent(agentId);
         if (res.success) {
             setActiveAgentId(agentId);
-            setStatus(`Agent Activated: ${AGENTS.find(a => a.id === agentId)?.name}`);
-            setTimeout(() => setStatus(''), 2000);
+            setGlobalStatus('success', 'Agent Activated', `${AGENTS.find(a => a.id === agentId)?.name} is now online.`);
         }
     };
 
     // --- AI Extraction ---
     const handleDocUpload = async () => {
         try {
-            setStatus('Reading document...');
+            setGlobalStatus('uploading', 'Initializing Link...', 'Accessing document buffers.');
             const uploadRes = await window.intentoAPI.brainUploadDoc();
             
             if (uploadRes.success) {
-                setStatus('AI Analyzing & organizing...');
-                const extractRes = await window.intentoAPI.brainExtractTags(uploadRes.text);
+                setGlobalStatus('analyzing', 'Extracting Insights...', 'AI is parsing document architecture.');
+                let extractRes;
+                if (uploadRes.ext === '.pdf') {
+                    try {
+                        setGlobalStatus('analyzing', 'Vision Analysis...', 'Rendering PDF pages for visual inspection.');
+                        const pdfjsLib = await import('pdfjs-dist');
+                        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+
+                        const buffer = await window.intentoAPI.brainReadFileBuffer(uploadRes.filePath);
+                        const data = new Uint8Array(buffer);
+
+                        const loadingTask = pdfjsLib.getDocument({ data });
+                        const pdf = await loadingTask.promise;
+                        
+                        const numPages = Math.min(pdf.numPages, 3);
+                        const base64Images = [];
+
+                        for (let i = 1; i <= numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const viewport = page.getViewport({ scale: 2.0 });
+                            
+                            const canvas = document.createElement('canvas');
+                            const context = canvas.getContext('2d');
+                            canvas.height = viewport.height;
+                            canvas.width = viewport.width;
+
+                            await page.render({ canvasContext: context, viewport }).promise;
+                            base64Images.push(canvas.toDataURL('image/png'));
+                        }
+                        
+                        setGlobalStatus('analyzing', 'Vision Synthesis...', `Synthesizing context from ${numPages} pages.`);
+                        extractRes = await window.intentoAPI.brainExtractTagsImages(base64Images);
+
+                    } catch (pdfErr) {
+                        console.error('PDF Vision processing failed, falling back to text:', pdfErr);
+                        extractRes = await window.intentoAPI.brainExtractTags(uploadRes.text);
+                    }
+                } else {
+                    extractRes = await window.intentoAPI.brainExtractTags(uploadRes.text);
+                }
                 
                 if (extractRes.success) {
                     // Update state with new headings and tags
                     setHeadings(extractRes.headings || headings); 
-                    setTags(extractRes.tags || tags); // Full refresh usually better but extractRes returns full active state now
+                    setTags(extractRes.tags || tags); 
                     
-                    setStatus(`Extracted ${extractRes.extracted || 0} items!`);
-                    setTimeout(() => setStatus(''), 3000);
+                    setGlobalStatus('success', 'Context Synthesized', `Extracted ${extractRes.extracted || 0} intelligence items.`);
                     
-                    // Force refresh to be safe
                     loadBrainData(); 
                 } else {
-                    setStatus(`Extraction failed: ${extractRes.error}`);
+                    setGlobalStatus('error', 'Synthesis Failed', extractRes.error || 'Unknown extraction error.');
                 }
             } else if (uploadRes.error !== 'cancelled') {
-                setStatus(`Upload failed: ${uploadRes.error}`);
+                setGlobalStatus('error', 'Upload Interrupted', uploadRes.error || 'Failed to access document.');
             } else {
-                setStatus('');
+                clearGlobalStatus();
             }
         } catch (err) {
             console.error('Doc upload failed:', err);
-            setStatus('Error processing document.');
+            setGlobalStatus('error', 'System Fault', 'Unexpected error during neural ingestion.');
         }
     };
 
@@ -402,7 +446,7 @@ export default function BrainOnboarding() {
             <NeuralSidebar 
                 brains={brains}
                 activeTab={activeTab}
-                setActiveTab={setActiveTab} // Note: This might need adjustment if we removed tabs
+                setActiveTab={setActiveTab}
                 handleSwitchBrain={handleSwitchBrain}
                 handleDeleteBrain={handleDeleteBrain}
                 setShowAddModal={setShowAddModal}
@@ -414,52 +458,65 @@ export default function BrainOnboarding() {
                 {/* Header Control Bar */}
                 <div className={styles.nexusControls}>
                     <div className={styles.nexusHeader}>
-                         <div className={styles.headerBranding}>
-                             <div className={styles.brandingTop}>Intent Memory</div>
-                             <div className={styles.titleWithRename}>
-                                {isRenaming ? (
-                                    <div className={styles.renameWrapper}>
-                                        <input 
-                                            value={renameValue}
-                                            onChange={(e) => setRenameValue(e.target.value)}
-                                            autoFocus
-                                        />
-                                        <button onClick={handleRename}><Save size={18} /></button>
+                        {activeTab === 'settings' ? (
+                            <div className={styles.headerBranding}>
+                                <div className={styles.brandingTop}>SETTINGS</div>
+                                <div className={styles.titleGroup}>
+                                    <h1>AI Settings</h1>
+                                </div>
+                                <p className={styles.saveModeNote}>Manage provider keys and output countdown.</p>
+                            </div>
+                        ) : (
+                            <>
+                                <div className={styles.headerBranding}>
+                                    <div className={styles.brandingTop}>Intent Memory</div>
+                                    <div className={styles.titleWithRename}>
+                                        {isRenaming ? (
+                                            <div className={styles.renameWrapper}>
+                                                <input
+                                                    value={renameValue}
+                                                    onChange={(e) => setRenameValue(e.target.value)}
+                                                    autoFocus
+                                                />
+                                                <button onClick={handleRename}><Save size={18} /></button>
+                                            </div>
+                                        ) : (
+                                            <div className={styles.titleGroup}>
+                                                <h1>{activeBrain?.name || 'Load Brain...'}</h1>
+                                                {activeBrain && (
+                                                    <button className={styles.editBtn} onClick={() => setIsRenaming(true)}>
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
-                                ) : (
-                                    <div className={styles.titleGroup}>
-                                        <h1>{activeBrain?.name || 'Load Brain...'}</h1>
-                                        <button className={styles.editBtn} onClick={() => setIsRenaming(true)}>
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-                                        </button>
+                                    <div className={styles.statusRow}>
+                                        <div className={styles.integrityBadge}>System Active</div>
                                     </div>
-                                )}
-                             </div>
-                             {status && <div className={styles.statusRow}>
-                                <div className={styles.integrityBadge}>System Active</div>
-                                <span className={styles.nexusStatus}>{status}</span>
-                             </div>}
-                             <p className={styles.saveModeNote}>Changes save instantly to this device.</p>
-                             {persistenceIssue ? <p className={styles.persistenceWarning}>{persistenceIssue}</p> : null}
-                         </div>
+                                    <p className={styles.saveModeNote}>Changes save instantly to this device.</p>
+                                    {persistenceIssue ? <p className={styles.persistenceWarning}>{persistenceIssue}</p> : null}
+                                </div>
 
-                         <div className={styles.controlsRight}>
-                             {/* Tabs Navigation */}
-                             <div className={styles.tabNav}>
-                                {TABS.map(tab => (
-                                    <button 
-                                        key={tab.id}
-                                        className={`${styles.tabBtn} ${activeTab === tab.id ? styles.tabActive : ''}`}
-                                        onClick={() => setActiveTab(tab.id)}
-                                    >
-                                        <tab.icon size={14} />
-                                        {tab.label}
-                                    </button>
-                                ))}
-                         </div>{/* tabNav */}
-                         </div>{/* controlsRight */}
-                    </div>{/* nexusHeader */}
-                </div>{/* nexusControls */}
+                                <div className={styles.controlsRight}>
+                                    {/* Tabs Navigation */}
+                                    <div className={styles.tabNav}>
+                                        {TABS.map(tab => (
+                                            <button
+                                                key={tab.id}
+                                                className={`${styles.tabBtn} ${activeTab === tab.id ? styles.tabActive : ''}`}
+                                                onClick={() => setActiveTab(tab.id)}
+                                            >
+                                                <tab.icon size={14} />
+                                                {tab.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
 
                 {/* Main Content Area */}
                 <section className={styles.neuralZone}>
@@ -473,9 +530,9 @@ export default function BrainOnboarding() {
                             aiConfig={aiConfig}
                             apiCredits={apiCredits}
                             providerOverview={providerOverview}
-                            onSave={async (fullConfig) => {
-                                const saveResult = await window.intentoAPI.saveAIConfig(fullConfig);
-                                const nextConfig = saveResult?.config || fullConfig;
+                            onSave={async (payload) => {
+                                const saveResult = await window.intentoAPI.saveAIConfig(payload);
+                                const nextConfig = saveResult?.config || payload.config;
                                 setAiConfig(nextConfig);
                                 const overview = await window.intentoAPI.getProviderOverview();
                                 setProviderOverview(overview || []);
@@ -491,8 +548,16 @@ export default function BrainOnboarding() {
                                 return await window.intentoAPI.getAICredits(providerId);
                             }}
                         />
+                    ) : !activeBrain ? (
+                        <div className={styles.neuralLoading} style={{minHeight: '400px', opacity: 0.8}}>
+                            <div className={styles.emptyIcon} style={{marginBottom: 20, color: '#3f3f46'}}><LayoutGrid size={48} /></div>
+                            <h3>Nexus Offline</h3>
+                            <p style={{maxWidth: 300, textAlign: 'center', marginBottom: 24}}>No neural modules detected. Create your first brain to start digitizing context.</p>
+                            <button className={styles.nexusActionBtn} onClick={() => setShowAddModal(true)} style={{padding: '12px 24px'}}>
+                                <Plus size={16} /> INITIALIZE MODULE
+                            </button>
+                        </div>
                     ) : (
-                        // HEADINGS VIEW (Identity or Personality)
                         // HEADINGS VIEW (Identity or Personality)
                         <>
                            {activeTab === 'personality' ? (
@@ -651,7 +716,6 @@ export default function BrainOnboarding() {
 
                                     <DragOverlay dropAnimation={dropAnimation}>
                                         {activeDragId ? (
-                                            /* Render a static preview of the tag */
                                             <div className={styles.tagCard} style={{ cursor: 'grabbing', transform: 'scale(1.05)' }}>
                                                 <div className={styles.tagHeader}>
                                                     <div className={styles.tagLabel}>
@@ -670,7 +734,6 @@ export default function BrainOnboarding() {
                     )}
                 </section>
             </main>
-
 
             {showAddModal && (
                 <AddBrainModal 
@@ -691,4 +754,3 @@ export default function BrainOnboarding() {
         </div>
     );
 }
-
