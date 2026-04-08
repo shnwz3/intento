@@ -1,7 +1,0 @@
-﻿  ΓÇó electron-builder  version=24.13.3 os=10.0.26200
-  ΓÇó loaded configuration  file=package.json ("build" field)
-  ΓÇó rebuilding native dependencies  dependencies=@jitsi/robotjs@0.6.21 platform=win32 arch=x64
-  ΓÇó packaging       platform=win32 arch=x64 electron=33.4.11 appOutDir=release\win-unpacked
-  ΓÇó default Electron icon is used  reason=application icon is not set
-  ΓÇó building        target=nsis file=release\Intento Setup 1.0.0.exe archs=x64 oneClick=false perMachine=false
-  ΓÇó building block map  blockMapFile=release\Intento Setup 1.0.0.exe.blockmap

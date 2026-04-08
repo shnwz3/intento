@@ -30,7 +30,9 @@ class SmartWriterService {
         const prompt = promptService.getRewritePrompt(directive);
         const brainContext = '';
 
-        const response = await this._analyze(screenshotData, text, prompt, brainContext);
+        const response = await this._analyze('rewrite_with_context', screenshotData, text, prompt, brainContext, {
+            includeImage: false,
+        });
         
         if (typeof response === 'string' && response.includes('NO_CHANGE_NEEDED')) {
             return { stay: true, original: text };
@@ -47,7 +49,7 @@ class SmartWriterService {
         const prompt = promptService.getReplyPrompt(directive);
         const brainContext = this.brain.getSmartContext(prompt);
 
-        return this._analyze(screenshotData, selectedText, prompt, brainContext);
+        return this._analyze('screen_reply', screenshotData, selectedText, prompt, brainContext);
     }
 
     /**
@@ -60,19 +62,21 @@ class SmartWriterService {
         const brainContext = this.brain.hasContext() ? this.brain.getContext() : '';
 
         // AutoFill usually relies on screenshot context, not selected text
-        return this._analyze(screenshotData, '', prompt, brainContext);
+        return this._analyze('field_autofill', screenshotData, '', prompt, brainContext);
     }
 
     /**
      * Internal helper to call Vision Service
      */
-    async _analyze(screenshotData, selectedText, prompt, brainContext) {
-        const result = await this.vision.analyze(
-            screenshotData.base64,
+    async _analyze(taskKind, screenshotData, selectedText, prompt, brainContext, options = {}) {
+        const includeImage = options.includeImage !== false;
+        const result = await this.vision.analyze({
+            taskKind,
+            images: includeImage ? (screenshotData?.base64 || '') : '',
             selectedText,
             prompt,
-            brainContext
-        );
+            brainContext,
+        });
 
         if (!result.success) {
             throw new Error(result.error || 'AI analysis failed');

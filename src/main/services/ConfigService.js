@@ -1,6 +1,7 @@
 const Store = require('electron-store');
 const axios = require('axios');
 const { app, safeStorage } = require('electron');
+const { getCreditCheckModel } = require('./ai/ModelCatalog');
 
 const ENV_KEY_MAP = {
     GROK_API_KEY: 'grok',
@@ -18,6 +19,7 @@ const PROVIDER_ENDPOINTS = {
 };
 
 const SECRET_STORE_KEY = 'ai_secrets';
+const SECRET_UNAVAILABLE = Symbol('secret-unavailable');
 
 const DEFAULT_AI_CONFIG = {
     activeProvider: 'grok',
@@ -27,13 +29,6 @@ const DEFAULT_AI_CONFIG = {
         anthropic: '',
         grok: '',
         openrouter: '',
-    },
-    models: {
-        openai: 'gpt-4o',
-        gemini: 'gemini-1.5-flash',
-        anthropic: 'claude-3-5-sonnet',
-        grok: 'grok-2-vision-1212',
-        openrouter: 'openai/gpt-4o',
     },
     typing: {
         mode: 'type',
@@ -92,15 +87,10 @@ class ConfigService {
 
     _normalizeConfig(config = {}) {
         return {
-            ...DEFAULT_AI_CONFIG,
-            ...config,
+            activeProvider: String(config.activeProvider || DEFAULT_AI_CONFIG.activeProvider),
             keys: {
                 ...DEFAULT_AI_CONFIG.keys,
                 ...(config.keys || {}),
-            },
-            models: {
-                ...DEFAULT_AI_CONFIG.models,
-                ...(config.models || {}),
             },
             typing: {
                 ...DEFAULT_AI_CONFIG.typing,
@@ -124,7 +114,7 @@ class ConfigService {
 
         if (value.startsWith('enc:')) {
             if (!this._canUseSafeStorage()) {
-                return '';
+                return SECRET_UNAVAILABLE;
             }
             const encrypted = Buffer.from(value.slice(4), 'base64');
             return this.safeStorage?.decryptString ? this.safeStorage.decryptString(encrypted) : '';
@@ -155,25 +145,33 @@ class ConfigService {
     _readStoredSecrets() {
         const rawSecrets = this.store.get(SECRET_STORE_KEY);
         const secrets = this._emptyKeys();
+        const unavailable = new Set();
 
         if (!rawSecrets || typeof rawSecrets !== 'object') {
-            return secrets;
+            return { secrets, unavailable, rawSecrets: {} };
         }
 
         for (const providerId of Object.keys(secrets)) {
-            secrets[providerId] = this._decodeSecret(rawSecrets[providerId]);
+            const decoded = this._decodeSecret(rawSecrets[providerId]);
+            if (decoded === SECRET_UNAVAILABLE) {
+                unavailable.add(providerId);
+                continue;
+            }
+            secrets[providerId] = decoded;
         }
 
-        return secrets;
+        return { secrets, unavailable, rawSecrets };
     }
 
-    _writeStoredSecrets(secrets = {}) {
+    _writeStoredSecrets(secrets = {}, { preservedEntries = {} } = {}) {
         const serialized = {};
 
         for (const providerId of Object.keys(this._emptyKeys())) {
             const value = String(secrets[providerId] || '').trim();
             if (value) {
                 serialized[providerId] = this._encodeSecret(value);
+            } else if (preservedEntries[providerId]) {
+                serialized[providerId] = preservedEntries[providerId];
             }
         }
 
@@ -181,7 +179,8 @@ class ConfigService {
     }
 
     _resolveKeys() {
-        const resolved = this._readStoredSecrets();
+        const { secrets } = this._readStoredSecrets();
+        const resolved = { ...secrets };
 
         for (const [envVar, providerId] of Object.entries(ENV_KEY_MAP)) {
             const envValue = process.env[envVar];
@@ -194,10 +193,14 @@ class ConfigService {
     }
 
     _buildKeyStatus(keys = this._resolveKeys()) {
+        const storedSecretEntries = this.store.get(SECRET_STORE_KEY) || {};
         return Object.fromEntries(
             Object.keys(this._emptyKeys()).map((providerId) => [
                 providerId,
-                Boolean(keys[providerId] && keys[providerId].trim()),
+                Boolean(
+                    (keys[providerId] && keys[providerId].trim())
+                    || storedSecretEntries[providerId]
+                ),
             ])
         );
     }
@@ -209,19 +212,25 @@ class ConfigService {
     }
 
     _migratePlaintextKeys(config) {
-        const storedSecrets = this._readStoredSecrets();
+        const { secrets: storedSecrets, unavailable, rawSecrets } = this._readStoredSecrets();
         let changed = false;
+        const preservedEntries = {};
 
         for (const providerId of Object.keys(this._emptyKeys())) {
+            if (unavailable.has(providerId) && rawSecrets[providerId]) {
+                preservedEntries[providerId] = rawSecrets[providerId];
+            }
+
             const plaintextValue = String(config.keys?.[providerId] || '').trim();
-            if (plaintextValue && !storedSecrets[providerId]) {
+            const hasStoredSecret = unavailable.has(providerId) || Boolean(storedSecrets[providerId]);
+            if (plaintextValue && !hasStoredSecret) {
                 storedSecrets[providerId] = plaintextValue;
                 changed = true;
             }
         }
 
         if (changed) {
-            this._writeStoredSecrets(storedSecrets);
+            this._writeStoredSecrets(storedSecrets, { preservedEntries });
         }
 
         return changed;
@@ -244,8 +253,15 @@ class ConfigService {
             }
         }
 
-        const resolvedKeys = this._resolveKeys();
-        if (!resolvedKeys[config.activeProvider] && firstEnvProvider) {
+        const { secrets: resolvedKeys, unavailable } = this._readStoredSecrets();
+        for (const [envVar, providerId] of Object.entries(ENV_KEY_MAP)) {
+            const envValue = process.env[envVar];
+            if (envValue) {
+                resolvedKeys[providerId] = envValue;
+            }
+        }
+
+        if (!resolvedKeys[config.activeProvider] && !unavailable.has(config.activeProvider) && firstEnvProvider) {
             config.activeProvider = firstEnvProvider;
             console.log(`Auto-switched to ${firstEnvProvider} (has env key)`);
             this._storeConfig(config);
@@ -282,33 +298,49 @@ class ConfigService {
     }
 
     savePublicConfig(config, { keyUpdates = {}, clearKeys = [] } = {}) {
-        const current = this.getConfig();
+        const currentConfig = this._getStoredConfig();
+        const { secrets: storedSecrets, unavailable, rawSecrets } = this._readStoredSecrets();
         const nextKeys = {
-            ...current.keys,
-            ...keyUpdates,
+            ...storedSecrets,
         };
+        const preservedEntries = {};
+
+        for (const providerId of Object.keys(this._emptyKeys())) {
+            if (unavailable.has(providerId) && rawSecrets[providerId]) {
+                preservedEntries[providerId] = rawSecrets[providerId];
+            }
+        }
+
+        for (const [providerId, value] of Object.entries(keyUpdates || {})) {
+            if (!Object.prototype.hasOwnProperty.call(nextKeys, providerId)) continue;
+            nextKeys[providerId] = String(value || '').trim();
+        }
 
         for (const providerId of clearKeys) {
             nextKeys[providerId] = '';
         }
 
-        return this.saveConfig({
-            ...current,
+        const normalized = this._normalizeConfig({
+            ...currentConfig,
             ...config,
-            models: {
-                ...current.models,
-                ...(config.models || {}),
-            },
             typing: {
-                ...current.typing,
+                ...currentConfig.typing,
                 ...(config.typing || {}),
             },
             privacy: {
-                ...current.privacy,
+                ...currentConfig.privacy,
                 ...(config.privacy || {}),
             },
             keys: nextKeys,
         });
+        this._writeStoredSecrets(normalized.keys, { preservedEntries });
+        this._storeConfig(normalized);
+        console.log('Config saved:', normalized.activeProvider, normalized.typing.mode);
+        return {
+            success: true,
+            config: this.getConfig(),
+            publicConfig: this.getPublicConfig(),
+        };
     }
 
     getTypingConfig() {
@@ -332,8 +364,9 @@ class ConfigService {
 
     getProviderOverview() {
         const config = this.getConfig();
+        const keyStatus = this._buildKeyStatus(config.keys);
         return Object.keys(DEFAULT_AI_CONFIG.keys).map((providerId) => {
-            const hasKey = Boolean(config.keys[providerId] && config.keys[providerId].trim());
+            const hasKey = Boolean(keyStatus[providerId]);
             return {
                 id: providerId,
                 isActive: config.activeProvider === providerId,
@@ -383,7 +416,7 @@ class ConfigService {
             if (provider === 'anthropic') {
                 try {
                     const res = await axios.post(`${PROVIDER_ENDPOINTS.anthropic}/messages`, {
-                        model: 'claude-3-5-sonnet-20241022',
+                        model: getCreditCheckModel('anthropic'),
                         max_tokens: 1,
                         messages: [{ role: 'user', content: 'hi' }],
                     }, {

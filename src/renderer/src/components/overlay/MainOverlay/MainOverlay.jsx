@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertCircle, CheckCircle2, Loader2, Send } from 'lucide-react';
 import CaptureArea from '../CaptureArea/CaptureArea';
 import BrainButton from '../BrainButton/BrainButton';
@@ -7,6 +7,7 @@ import styles from './MainOverlay.module.scss';
 const INITIAL_HINT = 'Ask Intento anything...';
 
 export default function MainOverlay() {
+  const inputRef = useRef(null);
   const [prompt, setPrompt] = useState('');
   const [phase, setPhase] = useState('idle');
   const [statusMessage, setStatusMessage] = useState('');
@@ -18,6 +19,15 @@ export default function MainOverlay() {
   const [countdownSeconds, setCountdownSeconds] = useState(3);
 
   const isBusy = phase === 'capturing' || phase === 'analyzing' || phase === 'typing';
+
+  const focusPromptInput = useCallback(() => {
+    requestAnimationFrame(() => {
+      const input = inputRef.current;
+      if (!input) return;
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    });
+  }, []);
 
   useEffect(() => {
     let cleanupBrain = null;
@@ -64,6 +74,7 @@ export default function MainOverlay() {
       setScreenshot(result.base64);
       setPhase('ready');
       setStatusMessage('Intento is ready for your next response.');
+      focusPromptInput();
       return;
     }
 
@@ -71,17 +82,22 @@ export default function MainOverlay() {
     setPhase('error');
     setErrorMessage(result.message || result.error || 'Intento could not get ready.');
     setStatusMessage('Intento could not get ready right now.');
-  }, []);
+  }, [focusPromptInput]);
 
   useEffect(() => {
-    const cleanupShortcut = window.intentoAPI.onShortcut(() => {
-      handleCapture();
+    focusPromptInput();
+  }, [focusPromptInput]);
+
+  useEffect(() => {
+    const cleanupShortcut = window.intentoAPI.onShortcut(async () => {
+      await handleCapture();
+      focusPromptInput();
     });
 
     return () => {
       cleanupShortcut?.();
     };
-  }, [handleCapture]);
+  }, [focusPromptInput, handleCapture]);
 
   const handleSend = useCallback(async () => {
     if (isBusy) return;
@@ -97,6 +113,7 @@ export default function MainOverlay() {
     setErrorMessage('');
     setStatusMessage('Preparing your Intento response...');
     window.intentoAPI.hudShow('Intento is thinking...');
+    window.intentoAPI.minimize?.();
 
     try {
       const formState = await window.intentoAPI.inspectForm(screenshot);
@@ -136,7 +153,7 @@ export default function MainOverlay() {
       setStatusMessage('Drafting a response...');
       const result = await window.intentoAPI.analyze(
         '',
-        prompt || 'Look at the screen and answer my question or give actions.'
+        prompt || 'Look at the screen and generate a short but detailed response in about 2-4 sentences. Keep it specific, useful, and not too long.'
       );
 
       if (!result.success) {
@@ -207,6 +224,7 @@ export default function MainOverlay() {
 
       <div className={styles.inputWrapper}>
         <input
+          ref={inputRef}
           type="text"
           className={styles.input}
           value={prompt}

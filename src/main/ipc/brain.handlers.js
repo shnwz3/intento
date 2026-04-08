@@ -78,53 +78,59 @@ Example JSON Structure:
 IMPORTANT: You MUST return complete, valid JSON. If the data is long, reduce the number of tags per category rather than producing incomplete JSON.`;
 
         try {
-            const result = await vision.analyze(base64Images, '', extractionPrompt);
+            const result = await vision.analyze({
+                taskKind: 'brain_doc_extract_vision',
+                images: base64Images,
+                prompt: extractionPrompt,
+            });
             if (!result.success) {
                 return { success: false, error: result.error || result.message };
             }
 
-            let extractedData;
+            let extractedData = result.parsed;
             try {
-                let cleaned = result.response.trim();
-                // We share the identical parsing and cleanup logic
-                if (cleaned.startsWith('\`\`\`')) {
-                    cleaned = cleaned.replace(/\`\`\`json?\n?/g, '').replace(/\`\`\`/g, '');
-                }
-                cleaned = cleaned.trim();
-
-                try {
-                    extractedData = JSON.parse(cleaned);
-                } catch (firstErr) {
-                    // Attempt to repair truncated JSON
-                    console.warn('AI JSON truncated, attempting repair...');
-                    let repaired = cleaned;
-
-                    // Close any unterminated string
-                    const quoteCount = (repaired.match(/(?<!\\\\)"/g) || []).length;
-                    if (quoteCount % 2 !== 0) {
-                        repaired += '"';
+                if (!Array.isArray(extractedData)) {
+                    let cleaned = result.response.trim();
+                    // We share the identical parsing and cleanup logic
+                    if (cleaned.startsWith('\`\`\`')) {
+                        cleaned = cleaned.replace(/\`\`\`json?\n?/g, '').replace(/\`\`\`/g, '');
                     }
-
-                    // Remove trailing comma before closing
-                    repaired = repaired.replace(/,\s*$/, '');
-
-                    // Close open braces/brackets
-                    const stack = [];
-                    for (const ch of repaired) {
-                        if (ch === '{') stack.push('}');
-                        else if (ch === '[') stack.push(']');
-                        else if (ch === '}' || ch === ']') {
-                            if (stack.length > 0) stack.pop();
-                        }
-                    }
-                    repaired += stack.reverse().join('');
+                    cleaned = cleaned.trim();
 
                     try {
-                        extractedData = JSON.parse(repaired);
-                        console.log('JSON repair succeeded');
-                    } catch (repairErr) {
-                        console.error('AI JSON Parse Error (repair also failed):', firstErr);
-                        return { success: false, error: 'AI returned incomplete data. Try uploading a smaller document or try again.', raw: result.response };
+                        extractedData = JSON.parse(cleaned);
+                    } catch (firstErr) {
+                        // Attempt to repair truncated JSON
+                        console.warn('AI JSON truncated, attempting repair...');
+                        let repaired = cleaned;
+
+                        // Close any unterminated string
+                        const quoteCount = (repaired.match(/(?<!\\\\)"/g) || []).length;
+                        if (quoteCount % 2 !== 0) {
+                            repaired += '"';
+                        }
+
+                        // Remove trailing comma before closing
+                        repaired = repaired.replace(/,\s*$/, '');
+
+                        // Close open braces/brackets
+                        const stack = [];
+                        for (const ch of repaired) {
+                            if (ch === '{') stack.push('}');
+                            else if (ch === '[') stack.push(']');
+                            else if (ch === '}' || ch === ']') {
+                                if (stack.length > 0) stack.pop();
+                            }
+                        }
+                        repaired += stack.reverse().join('');
+
+                        try {
+                            extractedData = JSON.parse(repaired);
+                            console.log('JSON repair succeeded');
+                        } catch (_repairErr) {
+                            console.error('AI JSON Parse Error (repair also failed):', firstErr);
+                            return { success: false, error: 'AI returned incomplete data. Try uploading a smaller document or try again.', raw: result.response };
+                        }
                     }
                 }
             } catch (outerErr) {
@@ -176,53 +182,58 @@ ${documentText.substring(0, 12000)}
 IMPORTANT: You MUST return complete, valid JSON. If the data is long, reduce the number of tags per category rather than producing incomplete JSON.`;
 
         try {
-            const result = await vision.analyzeTextOnly(extractionPrompt);
+            const result = await vision.analyzeText({
+                taskKind: 'brain_doc_extract_text',
+                prompt: extractionPrompt,
+            });
             if (!result.success) {
                 return { success: false, error: result.error || result.message };
             }
 
-            let extractedData;
+            let extractedData = result.parsed;
             try {
-                let cleaned = result.response.trim();
-                if (cleaned.startsWith('```')) {
-                    cleaned = cleaned.replace(/```json?\n?/g, '').replace(/```/g, '');
-                }
-                cleaned = cleaned.trim();
-
-                // First try direct parse
-                try {
-                    extractedData = JSON.parse(cleaned);
-                } catch (firstErr) {
-                    // Attempt to repair truncated JSON
-                    console.warn('AI JSON truncated, attempting repair...');
-                    let repaired = cleaned;
-
-                    // Close any unterminated string
-                    const quoteCount = (repaired.match(/(?<!\\)"/g) || []).length;
-                    if (quoteCount % 2 !== 0) {
-                        repaired += '"';
+                if (!Array.isArray(extractedData)) {
+                    let cleaned = result.response.trim();
+                    if (cleaned.startsWith('```')) {
+                        cleaned = cleaned.replace(/```json?\n?/g, '').replace(/```/g, '');
                     }
+                    cleaned = cleaned.trim();
 
-                    // Remove trailing comma before closing
-                    repaired = repaired.replace(/,\s*$/, '');
-
-                    // Close open braces/brackets
-                    const stack = [];
-                    for (const ch of repaired) {
-                        if (ch === '{') stack.push('}');
-                        else if (ch === '[') stack.push(']');
-                        else if (ch === '}' || ch === ']') {
-                            if (stack.length > 0) stack.pop();
-                        }
-                    }
-                    repaired += stack.reverse().join('');
-
+                    // First try direct parse
                     try {
-                        extractedData = JSON.parse(repaired);
-                        console.log('JSON repair succeeded');
-                    } catch (repairErr) {
-                        console.error('AI JSON Parse Error (repair also failed):', firstErr);
-                        return { success: false, error: 'AI returned incomplete data. Try uploading a smaller document or try again.', raw: result.response };
+                        extractedData = JSON.parse(cleaned);
+                    } catch (firstErr) {
+                        // Attempt to repair truncated JSON
+                        console.warn('AI JSON truncated, attempting repair...');
+                        let repaired = cleaned;
+
+                        // Close any unterminated string
+                        const quoteCount = (repaired.match(/(?<!\\)"/g) || []).length;
+                        if (quoteCount % 2 !== 0) {
+                            repaired += '"';
+                        }
+
+                        // Remove trailing comma before closing
+                        repaired = repaired.replace(/,\s*$/, '');
+
+                        // Close open braces/brackets
+                        const stack = [];
+                        for (const ch of repaired) {
+                            if (ch === '{') stack.push('}');
+                            else if (ch === '[') stack.push(']');
+                            else if (ch === '}' || ch === ']') {
+                                if (stack.length > 0) stack.pop();
+                            }
+                        }
+                        repaired += stack.reverse().join('');
+
+                        try {
+                            extractedData = JSON.parse(repaired);
+                            console.log('JSON repair succeeded');
+                        } catch (_repairErr) {
+                            console.error('AI JSON Parse Error (repair also failed):', firstErr);
+                            return { success: false, error: 'AI returned incomplete data. Try uploading a smaller document or try again.', raw: result.response };
+                        }
                     }
                 }
             } catch (outerErr) {

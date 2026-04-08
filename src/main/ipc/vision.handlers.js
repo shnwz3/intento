@@ -1,6 +1,7 @@
 const { dialog, ipcMain } = require('electron');
 const configService = require('../services/ConfigService');
 const serviceManager = require('../services/ServiceManager');
+const { PROVIDERS } = require('../services/ai/ProviderRegistry');
 
 // We will fetch services lazily or after init
 let vision, screenshot, brain;
@@ -13,9 +14,10 @@ async function ensureCaptureConsent() {
     const { getMainWindow } = require('../windows/mainWindow');
     const ownerWindow = getMainWindow();
     const { activeProvider } = configService.getConfig();
+    const activeProviderLabel = PROVIDERS[activeProvider]?.label || activeProvider;
     const detail = [
         'Intento captures your full primary screen when you press Ctrl+Alt+C.',
-        `That image may be sent to your selected AI provider (${activeProvider}) to generate a response.`,
+        `That image may be sent to your selected AI provider (${activeProviderLabel}) to generate a response.`,
         'Make sure no sensitive information is visible before you continue.',
     ].join('\n\n');
 
@@ -120,12 +122,13 @@ function registerIpcHandlers() {
                 brainContext = shouldSkip ? '' : brain.getContext();
             }
 
-            const result = await vision.analyze(
-                lastScreenshot.base64,
+            const result = await vision.analyze({
+                taskKind: 'screen_reply',
+                images: lastScreenshot.base64,
                 selectedText,
                 prompt,
-                brainContext
-            );
+                brainContext,
+            });
 
             return result;
         } catch (err) {

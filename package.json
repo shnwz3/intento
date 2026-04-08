@@ -5,7 +5,7 @@
     "author": "Intento Team",
     "main": "src/main/index.js",
     "scripts": {
-        "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+        "dev": "node scripts/dev-runner.cjs",
         "build": "vite build && electron-builder",
         "release": "vite build && electron-builder --publish always",
         "vite:dev": "vite",

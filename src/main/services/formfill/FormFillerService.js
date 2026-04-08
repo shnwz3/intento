@@ -24,13 +24,17 @@ class FormFillerService {
     async inspectFormState(base64, options = {}) {
         const minimumFields = Number.isInteger(options.minimumFields) ? options.minimumFields : 2;
         const prompt = promptService.getFormScenePrompt(minimumFields);
-        const result = await this.vision.analyze(base64, '', prompt, '');
+        const result = await this.vision.analyze({
+            taskKind: 'form_scene_parse',
+            images: base64,
+            prompt,
+        });
 
         if (!result.success) {
             throw new Error(result.error || 'Form inspection failed');
         }
 
-        const parsed = this._parseJSON(result.response);
+        const parsed = result.parsed || this._parseJSON(result.response);
         if (Array.isArray(parsed)) {
             return {
                 ...this._normalizeFieldResult(parsed, minimumFields),
@@ -250,13 +254,17 @@ class FormFillerService {
 
     async _generateAIValues(fields, brainContext) {
         const prompt = promptService.getFormFillPrompt(fields, brainContext);
-        const result = await this.vision.analyzeTextOnly(prompt);
+        const result = await this.vision.analyzeText({
+            taskKind: 'form_fill_values',
+            prompt,
+            expectedItemCount: fields.length,
+        });
 
         if (!result.success) {
             throw new Error(result.error || 'Failed to generate fill values');
         }
 
-        const values = this._parseJSON(result.response);
+        const values = result.parsed || this._parseJSON(result.response);
         if (!Array.isArray(values) || values.length !== fields.length) {
             throw new Error('AI returned invalid fill data. Please try again.');
         }
@@ -266,13 +274,17 @@ class FormFillerService {
 
     async _generateChoiceSelections(groups, brainContext) {
         const prompt = promptService.getFormChoicePrompt(groups, brainContext);
-        const result = await this.vision.analyzeTextOnly(prompt);
+        const result = await this.vision.analyzeText({
+            taskKind: 'form_choice_select',
+            prompt,
+            expectedItemCount: groups.length,
+        });
 
         if (!result.success) {
             throw new Error(result.error || 'Failed to generate choice selections');
         }
 
-        const selections = this._parseJSON(result.response);
+        const selections = result.parsed || this._parseJSON(result.response);
         if (!Array.isArray(selections) || selections.length !== groups.length) {
             throw new Error('AI returned invalid choice selections. Please try again.');
         }

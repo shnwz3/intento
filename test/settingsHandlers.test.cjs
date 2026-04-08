@@ -140,4 +140,76 @@ module.exports = [
             assert.deepEqual(sent, [['config:update', saveResult.config]]);
         },
     },
+    {
+        name: 'settings handlers reject malformed save payloads instead of using raw config fallback',
+        async run() {
+            const handlers = new Map();
+            let publicSaveCalled = false;
+            let legacySaveCalled = false;
+            let refreshCalled = false;
+
+            const { registerSettingsHandlers } = loadWithMocks(
+                path.join(__dirname, '..', 'src', 'main', 'ipc', 'settings.handlers.js'),
+                {
+                    electron: {
+                        ipcMain: {
+                            handle(name, callback) {
+                                handlers.set(name, callback);
+                            },
+                        },
+                        BrowserWindow: {
+                            getAllWindows() {
+                                return [];
+                            },
+                        },
+                        shell: {
+                            async openExternal() {},
+                        },
+                    },
+                    '../services/ConfigService': {
+                        getPublicConfig() {
+                            return {};
+                        },
+                        savePublicConfig() {
+                            publicSaveCalled = true;
+                            return { success: true, publicConfig: {} };
+                        },
+                        saveConfig() {
+                            legacySaveCalled = true;
+                            return { success: true, publicConfig: {} };
+                        },
+                        getProviderOverview() {
+                            return [];
+                        },
+                        getCredits() {
+                            return {};
+                        },
+                    },
+                    '../services/ServiceManager': {
+                        get() {
+                            refreshCalled = true;
+                            return {
+                                refreshProviders() {},
+                            };
+                        },
+                    },
+                }
+            );
+
+            registerSettingsHandlers();
+            const saveConfig = handlers.get('saveAIConfig');
+
+            await assert.rejects(
+                () => saveConfig(null, {
+                    activeProvider: 'openai',
+                    typing: { countdownSeconds: 3 },
+                }),
+                /saveAIConfig requires a payload shaped like/
+            );
+
+            assert.equal(publicSaveCalled, false);
+            assert.equal(legacySaveCalled, false);
+            assert.equal(refreshCalled, false);
+        },
+    },
 ];

@@ -90,6 +90,8 @@ module.exports = [
             assert.equal(service.getConfig().keys.openai, 'super-secret-key');
             assert.equal(service.getPublicConfig().keys.openai, '');
             assert.equal(service.getPublicConfig().keyStatus.openai, true);
+            assert.equal('models' in service.getPublicConfig(), false);
+            assert.equal('models' in service.getConfig(), false);
             assert.equal(store.data.ai_config.keys.openai, '');
             assert.notEqual(store.data.ai_secrets.openai, 'super-secret-key');
 
@@ -104,7 +106,7 @@ module.exports = [
         },
     },
     {
-        name: 'ConfigService defers safeStorage-backed initialization until Electron is ready',
+        name: 'ConfigService preserves encrypted key presence before Electron is ready',
         run() {
             let readyCallback = null;
             let decryptCalls = 0;
@@ -134,7 +136,7 @@ module.exports = [
                 },
             });
 
-            new ConfigService({
+            const service = new ConfigService({
                 store,
                 safeStorage: {
                     ...safeStorageMock,
@@ -147,6 +149,7 @@ module.exports = [
 
             assert.equal(decryptCalls, 0);
             assert.equal(typeof readyCallback, 'function');
+            assert.equal(service.getPublicConfig().keyStatus.openai, true);
         },
     },
     {
@@ -174,6 +177,39 @@ module.exports = [
 
             assert.equal(service.getConfig().keys.grok, '');
             assert.equal(service.getPublicConfig().keyStatus.grok, false);
+        },
+    },
+    {
+        name: 'ConfigService does not persist env-provided keys when saving public settings',
+        run() {
+            const previousOpenAIKey = process.env.OPENAI_API_KEY;
+            process.env.OPENAI_API_KEY = 'env-only-openai-key';
+
+            try {
+                const { ConfigService } = loadConfigServiceModule();
+                const store = new StoreMock();
+                const service = new ConfigService({
+                    store,
+                    safeStorage: safeStorageMock,
+                });
+
+                assert.equal(service.getConfig().keys.openai, 'env-only-openai-key');
+
+                service.savePublicConfig({
+                    activeProvider: 'openai',
+                    typing: { countdownSeconds: 4 },
+                });
+
+                assert.equal(service.getConfig().keys.openai, 'env-only-openai-key');
+                assert.equal(store.data.ai_secrets?.openai, undefined);
+                assert.equal(service.getPublicConfig().keyStatus.openai, true);
+            } finally {
+                if (previousOpenAIKey === undefined) {
+                    delete process.env.OPENAI_API_KEY;
+                } else {
+                    process.env.OPENAI_API_KEY = previousOpenAIKey;
+                }
+            }
         },
     },
 ];

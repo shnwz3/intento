@@ -2,19 +2,41 @@ const { BrowserWindow, ipcMain, shell } = require('electron');
 const configService = require('../services/ConfigService');
 const serviceManager = require('../services/ServiceManager');
 
+function isPlainObject(value) {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function normalizeSavePayload(payload) {
+    if (!isPlainObject(payload) || !Object.prototype.hasOwnProperty.call(payload, 'config') || !isPlainObject(payload.config)) {
+        throw new Error('saveAIConfig requires a payload shaped like { config, keyUpdates, clearKeys }.');
+    }
+
+    if (payload.keyUpdates != null && !isPlainObject(payload.keyUpdates)) {
+        throw new Error('saveAIConfig keyUpdates must be an object when provided.');
+    }
+
+    if (payload.clearKeys != null && !Array.isArray(payload.clearKeys)) {
+        throw new Error('saveAIConfig clearKeys must be an array when provided.');
+    }
+
+    return {
+        config: payload.config,
+        keyUpdates: payload.keyUpdates || {},
+        clearKeys: payload.clearKeys || [],
+    };
+}
+
 function registerSettingsHandlers() {
     ipcMain.handle('getAIConfig', async () => {
         return configService.getPublicConfig();
     });
 
     ipcMain.handle('saveAIConfig', async (_event, payload) => {
-        const hasPublicPayload = Boolean(payload?.config || payload?.keyUpdates || payload?.clearKeys);
-        const result = hasPublicPayload
-            ? configService.savePublicConfig(payload.config || {}, {
-                keyUpdates: payload.keyUpdates || {},
-                clearKeys: payload.clearKeys || [],
-            })
-            : configService.saveConfig(payload);
+        const normalizedPayload = normalizeSavePayload(payload);
+        const result = configService.savePublicConfig(normalizedPayload.config, {
+            keyUpdates: normalizedPayload.keyUpdates,
+            clearKeys: normalizedPayload.clearKeys,
+        });
         const publicConfig = result.publicConfig || configService.getPublicConfig();
 
         try {

@@ -15,6 +15,15 @@ module.exports = [
         },
     },
     {
+        name: 'cleanText preserves natural conversational phrasing',
+        run() {
+            assert.equal(
+                cleanText('I see your point, and I agree with the plan.'),
+                'I see your point, and I agree with the plan.'
+            );
+        },
+    },
+    {
         name: 'isRefusal catches common refusal phrases',
         run() {
             assert.equal(isRefusal("I'm sorry, I can't help with that."), true);

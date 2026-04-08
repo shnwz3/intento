@@ -3,7 +3,7 @@ const path = require('node:path');
 
 const { loadWithMocks } = require('./helpers/loadWithMocks.cjs');
 
-function loadVisionService(configOverrides = {}) {
+function loadVisionService(configOverrides = {}, electronOverrides = {}) {
     const defaultConfig = {
         activeProvider: 'grok',
         keys: {
@@ -22,15 +22,17 @@ function loadVisionService(configOverrides = {}) {
             ...(configOverrides.keys || {}),
         },
     };
-    const mockConfigService = {
-        getConfig() {
-            return resolvedConfig;
-        },
-    };
 
     return loadWithMocks(path.join(__dirname, '..', 'src', 'main', 'services', 'vision', 'VisionService.js'), {
-        electron: { app: { getAppPath: () => process.cwd() } },
-        '../ConfigService': mockConfigService,
+        electron: {
+            app: { getAppPath: () => process.cwd() },
+            ...electronOverrides,
+        },
+        '../ConfigService': {
+            getConfig() {
+                return resolvedConfig;
+            },
+        },
         '../../prompts/PromptService': {
             SYSTEM_PROMPT: 'system',
             DEFAULT_VISION_PROMPT: 'default prompt',
@@ -43,59 +45,8 @@ function loadVisionService(configOverrides = {}) {
 
 module.exports = [
     {
-        name: 'VisionService returns NO_PROVIDER when only local fallback exists',
-        async run() {
-            const VisionService = loadVisionService();
-            const service = new VisionService();
-
-            service.providers = [{ name: 'Ollama' }];
-            service._tryProvider = async () => ({
-                success: false,
-                code: 'PROVIDER_ERROR',
-                message: 'Ollama unavailable',
-                error: 'Ollama unavailable',
-            });
-
-            const result = await service.analyze('image');
-            assert.equal(result.success, false);
-            assert.equal(result.code, 'NO_PROVIDER');
-        },
-    },
-    {
-        name: 'VisionService rotates through providers and keeps the successful index',
-        async run() {
-            const VisionService = loadVisionService();
-            const service = new VisionService();
-
-            service.providers = [{ name: 'First' }, { name: 'Second' }];
-            service._tryProvider = async (provider) => {
-                if (provider.name === 'First') {
-                    return {
-                        success: false,
-                        code: 'PROVIDER_TIMEOUT',
-                        message: 'First timed out',
-                        error: 'First timed out',
-                    };
-                }
-
-                return {
-                    success: true,
-                    code: 'ANALYZE_OK',
-                    message: 'ok',
-                    response: 'usable answer',
-                    provider: provider.name,
-                };
-            };
-
-            const result = await service.analyze('image', 'selection', 'prompt', 'brain');
-            assert.equal(result.success, true);
-            assert.equal(result.provider, 'Second');
-            assert.equal(service.currentIndex, 1);
-        },
-    },
-    {
-        name: 'VisionService keeps the active provider first and includes other configured fallbacks',
-        async run() {
+        name: 'VisionService keeps the active provider first and includes other configured cloud fallbacks',
+        run() {
             const VisionService = loadVisionService({
                 activeProvider: 'openai',
                 keys: {
@@ -107,32 +58,101 @@ module.exports = [
             const service = new VisionService();
 
             assert.deepEqual(
-                service.providers.map((provider) => provider.name),
-                ['OpenAI', 'Grok', 'Gemini', 'Ollama']
+                service.providers.map((provider) => provider.label),
+                ['OpenAI', 'Groq', 'Gemini']
             );
         },
     },
     {
-        name: 'VisionService strips data URL prefixes before provider calls',
+        name: 'VisionService does not include local fallback by default',
+        run() {
+            const VisionService = loadVisionService({
+                activeProvider: 'openai',
+                keys: {
+                    openai: 'openai-key',
+                },
+            });
+            const service = new VisionService();
+
+            assert.deepEqual(
+                service.providers.map((provider) => provider.label),
+                ['OpenAI']
+            );
+        },
+    },
+    {
+        name: 'VisionService normalizes screen reply requests before routing',
         async run() {
             const VisionService = loadVisionService();
             const service = new VisionService();
-            const seen = [];
+            let seenRequest = null;
 
-            service.providers = [
-                {
-                    name: 'First',
-                    call: async (base64) => {
-                        seen.push(base64);
-                        return 'ok';
-                    },
+            service.router = {
+                async route(request) {
+                    seenRequest = request;
+                    return {
+                        success: true,
+                        response: 'usable answer',
+                        provider: 'Groq',
+                    };
                 },
-            ];
+            };
 
-            const result = await service.analyze('data:image/png;base64,QUJDREVGRw==');
+            const result = await service.analyze(
+                'data:image/png;base64,QUJDREVGRw==',
+                'selection',
+                'prompt',
+                'brain'
+            );
 
             assert.equal(result.success, true);
-            assert.deepEqual(seen, ['QUJDREVGRw==']);
+            assert.equal(seenRequest.taskKind, 'screen_reply');
+            assert.deepEqual(seenRequest.images, ['QUJDREVGRw==']);
+            assert.equal(seenRequest.userPrompt, 'BRAIN:brain\nSEL:selection\nprompt');
+        },
+    },
+    {
+        name: 'VisionService forwards text-only task requests through analyzeText',
+        async run() {
+            const VisionService = loadVisionService();
+            const service = new VisionService();
+            let seenRequest = null;
+
+            service.router = {
+                async route(request) {
+                    seenRequest = request;
+                    return {
+                        success: true,
+                        response: '["ok"]',
+                        parsed: ['ok'],
+                        provider: 'OpenAI',
+                    };
+                },
+            };
+
+            const result = await service.analyzeText({
+                taskKind: 'form_fill_values',
+                prompt: 'Fill these values',
+                expectedItemCount: 3,
+            });
+
+            assert.equal(result.success, true);
+            assert.equal(seenRequest.taskKind, 'form_fill_values');
+            assert.deepEqual(seenRequest.images, []);
+            assert.equal(seenRequest.userPrompt, 'Fill these values');
+            assert.equal(seenRequest.expectedItemCount, 3);
+        },
+    },
+    {
+        name: 'VisionService rejects deprecated analyzeTextOnly usage',
+        async run() {
+            const VisionService = loadVisionService();
+            const service = new VisionService();
+
+            await assert.rejects(
+                () => service.analyzeTextOnly('old prompt'),
+                /analyzeTextOnly is deprecated/
+            );
         },
     },
 ];

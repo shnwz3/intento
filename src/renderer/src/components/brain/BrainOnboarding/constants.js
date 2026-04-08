@@ -9,11 +9,11 @@ export const TABS = [
 ];
 
 export const PROVIDER_METADATA = {
-    grok: { name: 'GROK', url: 'https://console.groq.com/keys', recommended: true },
-    openai: { name: 'OPENAI', url: 'https://platform.openai.com/api-keys' },
-    gemini: { name: 'GEMINI', url: 'https://aistudio.google.com/app/apikey' },
-    anthropic: { name: 'ANTHROPIC', url: 'https://console.anthropic.com/settings/keys' },
-    openrouter: { name: 'OPENROUTER', url: 'https://openrouter.ai/settings/keys' }
+    grok: { name: 'Groq', url: 'https://console.groq.com/keys', recommended: true },
+    openai: { name: 'OpenAI', url: 'https://platform.openai.com/api-keys' },
+    gemini: { name: 'Gemini', url: 'https://aistudio.google.com/app/apikey' },
+    anthropic: { name: 'Anthropic', url: 'https://console.anthropic.com/settings/keys' },
+    openrouter: { name: 'OpenRouter', url: 'https://openrouter.ai/settings/keys' }
 };
 
 export const TAG_OPTIONS = {

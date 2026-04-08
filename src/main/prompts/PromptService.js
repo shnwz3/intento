@@ -6,7 +6,7 @@ class PromptService {
         this.TEXT_ONLY_SYSTEM_PROMPT = 'You are a precise data extraction engine. Return only what is asked.';
 
         // Default Analysis Prompt
-        this.DEFAULT_VISION_PROMPT = 'Look at this screen and GENERATE the next substantive reply or data. OUTPUT ONLY THE TEXT.';
+        this.DEFAULT_VISION_PROMPT = 'Look at this screen and generate the best short-but-detailed response. Keep it concise (about 2-4 sentences), specific, and useful. Avoid filler and meta-talk. OUTPUT ONLY THE TEXT.';
     }
 
     /**
@@ -40,7 +40,7 @@ class PromptService {
      * Get the prompt for generating a direct reply.
      */
     getReplyPrompt(agentDirective = '') {
-        let prompt = 'WRITER DIRECTIVE: Read the message on screen. GENERATE a substantive, high-IQ, and natural human reply (20-50 characters). NO robotic brevity. NO meta-talk. OUTPUT ONLY THE RESPONSE.';
+        let prompt = 'WRITER DIRECTIVE: Read the message on screen. GENERATE a concise but detailed natural human reply (about 2-4 sentences). Keep it specific and helpful, not too long. NO meta-talk. OUTPUT ONLY THE RESPONSE.';
         if (agentDirective) {
             prompt += `\n- AGENT STYLE OVERRIDE: ${agentDirective}`;
         }

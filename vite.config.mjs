@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
     plugins: [react()],
@@ -11,19 +14,19 @@ export default defineConfig({
         emptyOutDir: true,
         rollupOptions: {
             input: {
-                main: path.resolve(__dirname, 'src/renderer/index.html'),
-                brain: path.resolve(__dirname, 'src/renderer/brain.html'),
-                hud: path.resolve(__dirname, 'src/renderer/hud.html'),
+                main: path.resolve(rootDir, 'src/renderer/index.html'),
+                brain: path.resolve(rootDir, 'src/renderer/brain.html'),
+                hud: path.resolve(rootDir, 'src/renderer/hud.html'),
             },
         },
     },
     resolve: {
         alias: {
-            '@': path.resolve(__dirname, 'src/renderer/src'),
-            '@components': path.resolve(__dirname, 'src/renderer/src/components'),
-            '@hooks': path.resolve(__dirname, 'src/renderer/src/hooks'),
-            '@store': path.resolve(__dirname, 'src/renderer/src/store'),
-            '@styles': path.resolve(__dirname, 'src/renderer/src/styles'),
+            '@': path.resolve(rootDir, 'src/renderer/src'),
+            '@components': path.resolve(rootDir, 'src/renderer/src/components'),
+            '@hooks': path.resolve(rootDir, 'src/renderer/src/hooks'),
+            '@store': path.resolve(rootDir, 'src/renderer/src/store'),
+            '@styles': path.resolve(rootDir, 'src/renderer/src/styles'),
         },
     },
     css: {

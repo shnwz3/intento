@@ -20,8 +20,10 @@ module.exports = [
         async run() {
             const FormFillerService = loadFormFillerService();
             const vision = {
-                async analyze(_base64, _selection, prompt) {
-                    assert.equal(prompt, 'scene-prompt');
+                async analyze(request) {
+                    assert.equal(request.taskKind, 'form_scene_parse');
+                    assert.equal(request.prompt, 'scene-prompt');
+                    assert.equal(request.images, 'image-data');
                     return {
                         success: true,
                         response: `\`\`\`json
@@ -52,7 +54,8 @@ module.exports = [
         async run() {
             const FormFillerService = loadFormFillerService();
             const vision = {
-                async analyze() {
+                async analyze(request) {
+                    assert.equal(request.taskKind, 'form_scene_parse');
                     return {
                         success: true,
                         response: '{"fields":[{"label":"Rate your proficiency with Git","question":"Rate your proficiency with Git","type":"dropdown","hasValue":false},{"label":"Amazon Web Services (AWS)","question":"Which cloud platforms are you familiar with?","type":"other","hasValue":false},{"label":"Project summary","question":"Please provide a brief summary of a recent project","type":"textarea","hasValue":false}],"submitVisible":false,"submitLabel":null}',
@@ -83,8 +86,9 @@ module.exports = [
             const FormFillerService = loadFormFillerService();
             const prompts = [];
             const vision = {
-                async analyzeTextOnly(prompt) {
-                    prompts.push(prompt);
+                async analyzeText(request) {
+                    assert.equal(request.taskKind, 'form_fill_values');
+                    prompts.push(request.prompt);
                     return {
                         success: true,
                         response: '["I recently led a full-stack project that improved reliability and deployment speed."]',
@@ -128,8 +132,9 @@ module.exports = [
             });
             const prompts = [];
             const vision = {
-                async analyzeTextOnly(prompt) {
-                    prompts.push(prompt);
+                async analyzeText(request) {
+                    assert.equal(request.taskKind, 'form_fill_values');
+                    prompts.push(request.prompt);
                     return {
                         success: true,
                         response: '["15-04-2026","180000","Node.js"]',
@@ -166,8 +171,9 @@ module.exports = [
             const FormFillerService = loadFormFillerService();
             const prompts = [];
             const vision = {
-                async analyzeTextOnly(prompt) {
-                    prompts.push(prompt);
+                async analyzeText(request) {
+                    assert.equal(request.taskKind, 'form_choice_select');
+                    prompts.push(request.prompt);
                     return {
                         success: true,
                         response: '[["Amazon Web Services (AWS)"]]',
@@ -228,7 +234,8 @@ module.exports = [
         async run() {
             const FormFillerService = loadFormFillerService();
             const vision = {
-                async analyze() {
+                async analyze(request) {
+                    assert.equal(request.taskKind, 'form_scene_parse');
                     return {
                         success: true,
                         response: '{"fields":[{"label":"Choose","question":"What is your primary back-end programming language/framework?","type":"other","hasValue":false},{"label":"React","question":"Which front-end framework/library are you most proficient in?","type":"other","hasValue":false},{"label":"dd-mm-yyyy","question":"What is your preferred start date?","type":"other","hasValue":false},{"label":"PostgreSQL","question":"Select all database technologies you have experience with:","type":"other","hasValue":false}],"submitVisible":false,"submitLabel":null}',

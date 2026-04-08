@@ -116,7 +116,7 @@ export default function AIEngineConfig({
           <Globe size={24} className={styles.coreIcon} />
           <div>
             <h3>AI Engine Configuration</h3>
-            <p>Choose your active provider and countdown before output.</p>
+            <p>Choose your active provider and countdown before output. Intento auto-selects optimized models.</p>
           </div>
         </div>
 

@@ -25,7 +25,6 @@ function cleanText(text) {
         'the screen shows',
         'in the chat',
         'it appears',
-        'i see',
         'the reply is:',
     ];
 
