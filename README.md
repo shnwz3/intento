@@ -8,6 +8,8 @@
 
 Intento is a lightweight desktop assistant that watches your active window and provides intelligent, context-aware text suggestions in real time. It works across any application — chat clients, email, code editors, browsers, and more — without requiring you to switch context or copy-paste between windows.
 
+https://github.com/user-attachments/assets/5f69dbc1-37ab-42d5-b41e-1683de0abab0
+
 ### Key Features
 
 - **Cursor-aware suggestions** — Intento detects where you are typing and generates relevant responses on the fly.
